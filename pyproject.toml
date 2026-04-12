@@ -4,7 +4,6 @@ requires = [ "hatchling" ]
 
 [project]
 name = "nullforge"
-version = "0.1.0"
 description = "Forge the server's baseline from null"
 maintainers = [ { name = "wlix13", email = "github@wlix13.dev" } ]
 authors = [ { name = "wlix13", email = "github@wlix13.dev" } ]
@@ -13,3 +12,32 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.13",
 ]
+dynamic = [ "version" ]
+dependencies = [ "click", "pydantic", "pyinfra", "rich-click" ]
+
+[dependency-groups]
+dev = [ "poethepoet", "prek", "ruff", "ty" ]
+
+[tool.hatch]
+version.path = "nullforge/__init__.py"
+metadata.allow-direct-references = true
+build.targets.wheel.packages = [ "nullforge" ]
+
+[tool.ruff]
+line-length = 120
+lint.select = [ "E", "F", "I", "N", "S", "UP", "W", "YTT" ]
+lint.ignore = [
+  "N818", # Domain errors are named by failure mode, not with an -Error suffix
+  "S108", # Probable insecure usage of temporary file or directory
+]
+lint.isort.lines-after-imports = 2
+
+[tool.ty]
+environment.root = [ "./nullforge" ]
+
+[tool.poe]
+tasks.format = "uv run ruff format ."
+tasks.check-format = "uv run ruff format --check ."
+tasks.lint = "uv run ruff check ."
+tasks.typecheck = "uv run --group dev ty check"
+tasks.check = [ "check-format", "lint", "typecheck" ]
