@@ -5,6 +5,7 @@ requires = [ "hatchling" ]
 [project]
 name = "nullforge"
 description = "Forge the server's baseline from null"
+readme = "README.md"
 maintainers = [ { name = "wlix13", email = "github@wlix13.dev" } ]
 authors = [ { name = "wlix13", email = "github@wlix13.dev" } ]
 requires-python = ">=3.13,<3.14"
