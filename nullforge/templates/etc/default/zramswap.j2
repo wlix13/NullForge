@@ -1,0 +1,13 @@
+# Algorithm to use.
+ALGO={{ algo }}
+
+# Specifies the amount of RAM to use as zram swap.
+# If both PERCENT and SIZE are specified, SIZE takes precedence.
+{% if size.endswith('%') %}
+PERCENT={{ size.rstrip('%') }}
+{% else %}
+SIZE={{ size }}
+{% endif %}
+
+# Priority for the zram swap devices.
+PRIORITY=100

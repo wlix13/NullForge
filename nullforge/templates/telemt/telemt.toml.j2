@@ -1,0 +1,49 @@
+# Managed by NullForge. Local edits are overwritten on redeploy.
+
+[general]
+fast_mode = {{ FAST_MODE | lower }}
+use_middle_proxy = {{ USE_MIDDLE_PROXY | lower }}
+log_level = "silent"
+
+[general.modes]
+classic = {{ MODE_CLASSIC | lower }}
+secure = {{ MODE_SECURE | lower }}
+tls = {{ MODE_TLS | lower }}
+
+[server]
+max_connections = {{ MAX_CONNECTIONS }}
+port = {{ PORT }}
+
+[server.api]
+enabled = {{ API_ENABLED | lower }}
+
+[network]
+ipv6 = {{ IPV6 | lower }}
+prefer = {{ PREFER }}
+
+[timeouts]
+client_handshake = {{ CLIENT_HANDSHAKE }}
+
+[censorship]
+tls_domain = "{{ TLS_DOMAIN }}"
+{% if UNKNOWN_SNI_ACTION %}
+unknown_sni_action = "{{ UNKNOWN_SNI_ACTION }}"
+{% else %}
+#unknown_sni_action = "mask"
+{% endif %}
+
+[access.users]
+{% for name, secret in USERS.items() %}
+{{ name }} = "{{ secret }}"
+{% endfor %}
+
+[[upstreams]]
+type = "direct"
+{% if ROUTE_VIA_WARP %}
+# Egress is steered through WARP by teleproxy-warp.sh (per-uid policy routing),
+# so the upstream stays "direct" instead of binding to the "{{ WARP_IFACE }}" interface.
+{% else %}
+#interface = "{{ WARP_IFACE }}"
+{% endif %}
+weight = 10
+enabled = true
