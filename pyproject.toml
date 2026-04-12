@@ -1,0 +1,15 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = [ "hatchling" ]
+
+[project]
+name = "nullforge"
+version = "0.1.0"
+description = "Forge the server's baseline from null"
+maintainers = [ { name = "wlix13", email = "github@wlix13.dev" } ]
+authors = [ { name = "wlix13", email = "github@wlix13.dev" } ]
+requires-python = ">=3.13,<3.14"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.13",
+]
