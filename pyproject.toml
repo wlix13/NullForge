@@ -19,6 +19,7 @@ scripts.nullforge = "nullforge.cli.__main__:main"
 
 [dependency-groups]
 dev = [ "poethepoet", "prek", "ruff", "ty" ]
+tests = [ "pytest", "pytest-cov", "pytest-sugar" ]
 
 [tool.hatch]
 version.path = "nullforge/__init__.py"
@@ -32,14 +33,25 @@ lint.ignore = [
   "N818", # Domain errors are named by failure mode, not with an -Error suffix
   "S108", # Probable insecure usage of temporary file or directory
 ]
+lint.per-file-ignores."tests/*" = [
+  "S101", # Use of `assert` detected
+  "S104", # Possible binding to all interfaces
+  "S105", # Hardcoded password string
+  "S106", # Hardcoded password argument
+]
 lint.isort.lines-after-imports = 2
 
 [tool.ty]
 environment.root = [ "./nullforge" ]
 
+[tool.pytest]
+ini_options.testpaths = [ "tests" ]
+ini_options.addopts = "-ra -q --tb=short --cov=nullforge --strict-markers"
+
 [tool.poe]
 tasks.format = "uv run ruff format ."
 tasks.check-format = "uv run ruff format --check ."
 tasks.lint = "uv run ruff check ."
-tasks.typecheck = "uv run --group dev ty check"
+tasks.typecheck = "uv run --group dev --group tests ty check"
 tasks.check = [ "check-format", "lint", "typecheck" ]
+tasks.tests = "uv run --group tests pytest"
