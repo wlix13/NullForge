@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/wlix13/NullForge/compare/v0.1.0...v0.2.0) (2026-07-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** `nullforge cast -i <inventory>` replaces `pyinfra <inventory> nullforge/foundry/full_cast.py` invocation.
+
+### Features
+
+* **cli:** add nullforge CLI ([1f842e3](https://github.com/wlix13/NullForge/commit/1f842e38e1cecffa9ea390a1142d38854c1bde9b))
+
 ## 0.1.0 (2026-07-25)
 
 
