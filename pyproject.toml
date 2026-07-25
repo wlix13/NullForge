@@ -15,6 +15,7 @@ classifiers = [
 ]
 dynamic = [ "version" ]
 dependencies = [ "click", "pydantic", "pyinfra", "rich-click" ]
+scripts.nullforge = "nullforge.cli.__main__:main"
 
 [dependency-groups]
 dev = [ "poethepoet", "prek", "ruff", "ty" ]
