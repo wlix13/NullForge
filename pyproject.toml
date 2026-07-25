@@ -14,11 +14,24 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dynamic = [ "version" ]
-dependencies = [ "click", "pydantic", "pyinfra", "rich-click" ]
+dependencies = [
+  "click",
+  "pydantic",
+  "pyinfra",
+  "rich",
+  "rich-click",
+]
 scripts.nullforge = "nullforge.cli.__main__:main"
 
 [dependency-groups]
-dev = [ "poethepoet", "prek", "ruff", "ty" ]
+dev = [
+  "deptry",
+  "import-linter",
+  "poethepoet",
+  "prek",
+  "ruff",
+  "ty",
+]
 tests = [ "pytest", "pytest-cov", "pytest-sugar" ]
 
 [tool.hatch]
@@ -53,5 +66,67 @@ tasks.format = "uv run ruff format ."
 tasks.check-format = "uv run ruff format --check ."
 tasks.lint = "uv run ruff check ."
 tasks.typecheck = "uv run --group dev --group tests ty check"
-tasks.check = [ "check-format", "lint", "typecheck" ]
+tasks.lint-imports = "uv run --group dev lint-imports"
+tasks.deptry = "uv run --group dev deptry ."
+tasks.check = [ "check-format", "lint", "typecheck", "lint-imports", "deptry" ]
 tasks.tests = "uv run --group tests pytest"
+
+[tool.importlinter]
+root_package = "nullforge"
+
+[[tool.importlinter.contracts]]
+name = "deploy spine (cli -> foundry -> runes -> smithy -> molds -> models)"
+type = "layers"
+layers = [
+  "nullforge.cli | (nullforge.inventories)",
+  "nullforge.foundry",
+  "nullforge.runes",
+  "nullforge.smithy",
+  "nullforge.molds | nullforge.templates",
+  "nullforge.models",
+]
+
+[[tool.importlinter.contracts]]
+name = "models are pure value types"
+type = "forbidden"
+source_modules = [ "nullforge.models" ]
+forbidden_modules = [
+  "nullforge.cli",
+  "nullforge.foundry",
+  "nullforge.molds",
+  "nullforge.runes",
+  "nullforge.smithy",
+  "nullforge.templates",
+]
+
+[[tool.importlinter.contracts]]
+name = "templates are a leaf"
+type = "forbidden"
+source_modules = [ "nullforge.templates" ]
+forbidden_modules = [
+  "nullforge.cli",
+  "nullforge.foundry",
+  "nullforge.models",
+  "nullforge.molds",
+  "nullforge.runes",
+  "nullforge.smithy",
+]
+
+[[tool.importlinter.contracts]]
+name = "molds describe configuration, never provisioning"
+type = "forbidden"
+source_modules = [ "nullforge.molds" ]
+forbidden_modules = [
+  "nullforge.cli",
+  "nullforge.foundry",
+  "nullforge.runes",
+  "nullforge.smithy",
+  "nullforge.templates",
+]
+
+[[tool.importlinter.contracts]]
+name = "runes are self-contained"
+type = "independence"
+modules = [
+  "nullforge.runes.*",
+]
