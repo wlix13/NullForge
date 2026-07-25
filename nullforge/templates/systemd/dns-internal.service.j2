@@ -1,0 +1,15 @@
+[Unit]
+Description=Setup dns-internal dummy interface for blocky
+Before=blocky.service
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'ip link show dns-internal >/dev/null 2>&1 || ip link add dns-internal type dummy'
+ExecStart=/bin/sh -c 'ip addr show dev dns-internal | grep -q "{{ LISTEN_ADDRESS }}" || ip addr add {{ LISTEN_CIDR }} dev dns-internal'
+ExecStart=/sbin/ip link set dns-internal up
+ExecStop=/sbin/ip link del dns-internal
+
+[Install]
+WantedBy=multi-user.target
