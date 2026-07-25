@@ -14,11 +14,24 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dynamic = [ "version" ]
-dependencies = [ "click", "pydantic", "pyinfra", "rich-click" ]
+dependencies = [
+  "click",
+  "pydantic",
+  "pyinfra",
+  "rich",
+  "rich-click",
+]
 scripts.nullforge = "nullforge.cli.__main__:main"
 
 [dependency-groups]
-dev = [ "poethepoet", "prek", "ruff", "ty" ]
+dev = [
+  "deptry",
+  "import-linter",
+  "poethepoet",
+  "prek",
+  "ruff",
+  "ty",
+]
 tests = [ "pytest", "pytest-cov", "pytest-sugar" ]
 
 [tool.hatch]
