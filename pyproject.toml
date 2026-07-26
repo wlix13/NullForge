@@ -32,6 +32,7 @@ dev = [
   "ruff",
   "ty",
 ]
+docs = [ "zensical" ]
 tests = [ "pytest", "pytest-cov", "pytest-sugar" ]
 
 [tool.hatch]
@@ -68,7 +69,10 @@ tasks.lint = "uv run ruff check ."
 tasks.typecheck = "uv run --group dev --group tests ty check"
 tasks.lint-imports = "uv run --group dev lint-imports"
 tasks.deptry = "uv run --group dev deptry ."
-tasks.check = [ "check-format", "lint", "typecheck", "lint-imports", "deptry" ]
+tasks.lint-md = "uv run --group dev prek run markdownlint-cli2 --all-files"
+tasks.check = [ "check-format", "lint", "lint-md", "typecheck", "lint-imports", "deptry" ]
+tasks.docs = "uv run --group docs zensical build --clean --strict"
+tasks."docs:dev" = "uv run --group docs zensical serve"
 tasks.tests = "uv run --group tests pytest"
 
 [tool.importlinter]

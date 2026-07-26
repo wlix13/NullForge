@@ -19,9 +19,11 @@ labels:
     files:
       - '^README\.md$'
       - "^docs/"
+      - '^zensical\.toml$'
   - label: "ci-cd"
     files:
       - '^\.github/'
+      - '^\.markdownlint-cli2\.jsonc$'
   - label: "tests"
     files:
       - "^tests/"
