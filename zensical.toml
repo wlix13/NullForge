@@ -1,0 +1,110 @@
+[project]
+site_name = "NullForge"
+site_description = "Forge the server's baseline from null - an infrastructure-as-code framework built on pyinfra."
+site_author = "wlix13"
+site_url = "https://wlix13.github.io/NullForge/"
+copyright = "Copyright &copy; 2026 wlix13"
+
+repo_url = "https://github.com/wlix13/NullForge"
+repo_name = "wlix13/NullForge"
+edit_uri = "edit/main/docs/"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = [
+    { "Installation" = "getting-started/installation.md" },
+    { "Quickstart" = "getting-started/quickstart.md" },
+    { "CLI reference" = "getting-started/cli.md" },
+  ] },
+  { "Concepts" = [
+    { "Architecture" = "concepts/architecture.md" },
+    { "Inventories" = "concepts/inventories.md" },
+    { "Molds" = "concepts/molds.md" },
+    { "Runes" = "concepts/runes.md" },
+  ] },
+  { "Features" = [
+    "features/index.md",
+    { "Base system" = "features/base.md" },
+    { "Users" = "features/users.md" },
+    { "Network security" = "features/netsec.md" },
+    { "DNS" = "features/dns.md" },
+    { "Shell profiles" = "features/profiles.md" },
+    { "Cloudflare WARP" = "features/warp.md" },
+    { "Zero Trust Tunnel" = "features/zerotrust.md" },
+    { "Containers" = "features/containers.md" },
+    { "Monitoring" = "features/monitoring.md" },
+    { "HAProxy" = "features/haproxy.md" },
+    { "Xray" = "features/xray.md" },
+    { "Tor" = "features/tor.md" },
+    { "Telemt" = "features/telemt.md" },
+  ] },
+  { "Guides" = [
+    { "Custom runes" = "guides/custom-runes.md" },
+    { "Version pinning" = "guides/version-pinning.md" },
+  ] },
+  { "Contributing" = [
+    { "Development" = "contributing/development.md" },
+    { "Conventions" = "contributing/conventions.md" },
+  ] },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "content.action.edit",
+  "content.code.copy",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.sections",
+  "navigation.top",
+  "search.highlight",
+  "search.suggest",
+  "toc.follow",
+]
+
+[project.theme.icon]
+logo = "lucide/hammer"
+
+[[project.theme.palette]]
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/wlix13/NullForge"
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.def_list]
+[project.markdown_extensions.footnotes]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.betterem]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.emoji]
+emoji_generator = "zensical.extensions.emoji.to_svg"
+emoji_index = "zensical.extensions.emoji.twemoji"
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.keys]
+[project.markdown_extensions.pymdownx.magiclink]
+[project.markdown_extensions.pymdownx.smartsymbols]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+combine_header_slug = true
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true
