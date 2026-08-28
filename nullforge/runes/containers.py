@@ -8,7 +8,7 @@ from pyinfra.operations import apt, files, server, systemd
 from nullforge.models.containers import ContainersBackendType
 from nullforge.molds import ContainersMold, FeaturesMold, UserMold
 from nullforge.smithy.arch import deb_arch
-from nullforge.smithy.http import CURL_ARGS
+from nullforge.smithy.http import curl_args
 from nullforge.smithy.packages import get_pm
 from nullforge.smithy.versions import GPG_KEYS, STATIC_URLS
 
@@ -95,13 +95,15 @@ def _install_gvisor_rhel() -> None:
 
     arch = host.get_fact(Arch)
     base_url = f"https://storage.googleapis.com/gvisor/releases/release/latest/{arch}"
+    runsc_url = f"{base_url}/runsc"
+    shim_url = f"{base_url}/containerd-shim-runsc-v1"
 
     files.download(
         name="Download gVisor runsc binary",
-        src=f"{base_url}/runsc",
+        src=runsc_url,
         dest=runsc_path,
         mode="0755",
-        extra_curl_args=CURL_ARGS,
+        extra_curl_args=curl_args(runsc_url),
         _sudo=True,
         _retries=3,
         _retry_delay=10,
@@ -109,10 +111,10 @@ def _install_gvisor_rhel() -> None:
 
     files.download(
         name="Download gVisor containerd-shim",
-        src=f"{base_url}/containerd-shim-runsc-v1",
+        src=shim_url,
         dest="/usr/local/bin/containerd-shim-runsc-v1",
         mode="0755",
-        extra_curl_args=CURL_ARGS,
+        extra_curl_args=curl_args(shim_url),
         _sudo=True,
         _retries=3,
         _retry_delay=10,
@@ -151,7 +153,7 @@ def _install_docker() -> None:
         src=STATIC_URLS["docker_install"],
         dest=get_docker_path,
         mode="0755",
-        extra_curl_args=CURL_ARGS,
+        extra_curl_args=curl_args(STATIC_URLS["docker_install"]),
         _retries=3,
         _retry_delay=10,
     )

@@ -6,6 +6,7 @@ import pytest
 
 from nullforge.smithy.versions import (
     DEFAULT_VERSIONS,
+    RELEASE_ASSET_HOST,
     VERSION_MARKER_DIR,
     Versions,
     is_pinned_version_installed,
@@ -54,6 +55,26 @@ class TestArchSelect:
         with _versions_context("riscv64") as v:
             with pytest.raises(ValueError, match="Unsupported architecture"):
                 v._arch_select("amd64", "arm64")
+
+
+class TestReleaseCurlArgs:
+    URL = "https://github.com/o/r/releases/download/v1/tool.tar.gz"
+
+    def test_pins_reachable_release_asset_address(self) -> None:
+        with (
+            patch("nullforge.smithy.versions.reachable_address", return_value="1.2.3.4"),
+            patch("nullforge.smithy.versions.curl_args", return_value={"--retry": "3"}) as args,
+        ):
+            assert Versions.release_curl_args(self.URL) == {"--retry": "3"}
+        args.assert_called_once_with(self.URL, resolve=f"{RELEASE_ASSET_HOST}:443:1.2.3.4")
+
+    def test_unpinned_when_no_address_reachable(self) -> None:
+        with (
+            patch("nullforge.smithy.versions.reachable_address", return_value=None),
+            patch("nullforge.smithy.versions.curl_args", return_value={"--retry": "3"}) as args,
+        ):
+            Versions.release_curl_args(self.URL)
+        args.assert_called_once_with(self.URL, resolve=None)
 
 
 class TestVersionsUrls:

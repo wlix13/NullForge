@@ -6,7 +6,7 @@ from pyinfra.operations import files, server, systemd
 
 from nullforge.molds import FeaturesMold, XrayCoreMold
 from nullforge.smithy.admin import ensure_acl_access
-from nullforge.smithy.http import CURL_ARGS
+from nullforge.smithy.http import curl_args, curl_args_str
 from nullforge.smithy.versions import STATIC_URLS
 
 
@@ -51,7 +51,10 @@ def _install_xray(opts: XrayCoreMold) -> None:
 
     server.shell(
         name="Install Xray proxy",
-        commands=f'bash -lc "$(curl -L {STATIC_URLS["xray_install"]})" @ install --beta',
+        commands=(
+            f'script="$(curl -L {curl_args_str(STATIC_URLS["xray_install"])} {STATIC_URLS["xray_install"]})"'
+            ' && bash -lc "$script" @ install --beta'
+        ),
         _sudo=True,
     )
 
@@ -64,7 +67,7 @@ def _download_geo_data() -> None:
             name=f"Download {file}",
             src=url,
             dest=f"{BASE_DIR}/{file}",
-            extra_curl_args=CURL_ARGS,
+            extra_curl_args=curl_args(url),
             _sudo=True,
             _retries=3,
             _retry_delay=10,

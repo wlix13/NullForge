@@ -8,7 +8,7 @@ from pyinfra.facts.server import Command
 from pyinfra.operations import files
 
 from nullforge.smithy.arch import arch_id
-from nullforge.smithy.http import CURL_ARGS, pin_host_args
+from nullforge.smithy.http import curl_args, reachable_address
 
 
 DEFAULT_VERSIONS = {
@@ -103,8 +103,9 @@ class Versions:
         return f"https://github.com/{repo}/releases/download/{tag}/{asset}"
 
     @staticmethod
-    def release_curl_args() -> dict[str, str]:
-        return {**CURL_ARGS, **pin_host_args(RELEASE_ASSET_HOST)}
+    def release_curl_args(url: str) -> dict[str, str]:
+        address = reachable_address(RELEASE_ASSET_HOST)
+        return curl_args(url, resolve=f"{RELEASE_ASSET_HOST}:443:{address}" if address else None)
 
     def cloudflared_url(self) -> str:
         arch = self._arch_select("amd64", "arm64")

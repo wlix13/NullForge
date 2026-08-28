@@ -154,8 +154,8 @@ def _default_ipv4_sysctl() -> dict[str, str | int]:
         "net.ipv4.tcp_fin_timeout": 30,
         # --- MEMORY BUFFERS ---
         "net.core.optmem_max": 65536,
-        "net.core.rmem_default": 262144,
-        "net.core.wmem_default": 262144,
+        "net.core.rmem_default": 8388608,
+        "net.core.wmem_default": 8388608,
         "net.core.rmem_max": 67108864,
         "net.core.wmem_max": 67108864,
         "net.ipv4.tcp_rmem": "4096 87380 67108864",

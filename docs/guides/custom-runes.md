@@ -67,6 +67,7 @@ The deploy repo of the **Conglomerate** proxy fleet uses this shape for a repo-l
 | --- | --- |
 | `smithy.packages.get_pm()` | Distro-mapped package install/update/upgrade (apt/dnf) |
 | `smithy.install.install_release_binary()` | Download -> sha256-verify -> extract -> install a release binary |
+| `smithy.http.curl_args(url)` | Hardened `extra_curl_args` for `files.download`, falling back to [WARP](../features/warp.md#downloads-through-warp) when the direct route is filtered |
 | `smithy.versions.is_pinned_version_installed()` | Skip installs already at the [pinned version](version-pinning.md) |
 | `smithy.service.ensure_service_user()` | Dedicated system user + group for a service |
 | `smithy.admin.ensure_acl_access()` | Grant a user ACL access to a directory tree |
