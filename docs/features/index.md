@@ -7,11 +7,11 @@ The full cast visits features in the order below and deploys the ones whose `is_
 
 | Feature | Rune | Default | Active when |
 | --- | --- | --- | --- |
+| [Cloudflare WARP](warp.md) | `warp` | off | `install = true` |
 | [DNS](dns.md) | `dns` | **on** (Blocky) | `mode != "none"` |
 | [Users](users.md) | `users` | **on** | `manage = true` |
 | [Network security](netsec.md) | `netsec` | **on** | `install = true` |
 | [Shell profiles](profiles.md) | `profiles` | **on** (root only) | `for_root or for_user` |
-| [Cloudflare WARP](warp.md) | `warp` | off | `install = true` |
 | [Zero Trust Tunnel](zerotrust.md) | `zerotrust` | off | `install = true` |
 | [Containers](containers.md) | `containers` | off | `install = true` |
 | [Monitoring](monitoring.md) | `monitoring` | off | `install = true` |

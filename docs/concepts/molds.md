@@ -21,11 +21,11 @@ Two molds cover a host:
 
 ```python
 class FeaturesMold(BaseMold):
+    warp: WarpMold = Field(default_factory=WarpMold)
     dns: DnsMold = Field(default_factory=DnsMold)
     users: UserMold = Field(default_factory=UserMold)
     netsec: NetSecMold = Field(default_factory=NetSecMold)
     profiles: ProfilesMold = Field(default_factory=ProfilesMold)
-    warp: WarpMold = Field(default_factory=WarpMold)
     zerotrust: ZeroTrustTunnelMold = Field(default_factory=ZeroTrustTunnelMold)
     containers: ContainersMold = Field(default_factory=ContainersMold)
     monitoring: MonitoringMold = Field(default_factory=MonitoringMold)
