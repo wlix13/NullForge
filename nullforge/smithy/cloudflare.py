@@ -17,15 +17,16 @@ def ensure_cloudflared_binary() -> OperationMeta | None:
         host.noop("cloudflared binary is already installed")
         return None
 
+    url = get_versions().cloudflared_url()
     return files.download(
         name="Install cloudflared binary",
-        src=get_versions().cloudflared_url(),
+        src=url,
         dest=CLOUDFLARED_BINARY,
         mode="0755",
         user=CLOUDFLARE_USER,
         group=CLOUDFLARE_GROUP,
         force=True,
-        extra_curl_args=get_versions().release_curl_args(),
+        extra_curl_args=get_versions().release_curl_args(url),
         _sudo=True,
         _retries=3,
         _retry_delay=10,

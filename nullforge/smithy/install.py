@@ -98,7 +98,6 @@ def install_release_binary(
     checksum = sha256 if sha256 is not None else (sha256_for_download_url(url) if verify else None)
     if verify and checksum is None:
         logger.warning(f"No sha256 could be resolved for {url}; installing {name} without integrity verification")
-    curl_args = Versions.release_curl_args()
 
     if kind == "raw":
         return files.download(
@@ -108,7 +107,7 @@ def install_release_binary(
             mode=mode,
             force=True,
             sha256sum=checksum,
-            extra_curl_args=curl_args,
+            extra_curl_args=Versions.release_curl_args(url),
             _sudo=sudo,
             _retries=retries,
             _retry_delay=retry_delay,
@@ -130,7 +129,7 @@ def install_release_binary(
         dest=download_path,
         force=True,
         sha256sum=checksum,
-        extra_curl_args=curl_args,
+        extra_curl_args=Versions.release_curl_args(url),
         _sudo=sudo,
         _retries=retries,
         _retry_delay=retry_delay,
