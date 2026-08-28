@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/wlix13/NullForge/compare/v0.2.0...v0.3.0) (2026-08-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **molds:** deploy warp before other features
+* **smithy:** fall back to WARP interface for filtered downloads
+
+### Features
+
+* **molds:** deploy warp before other features ([a97cbfe](https://github.com/wlix13/NullForge/commit/a97cbfe9020bf0708acec4adf370cfa7113ea964))
+* **smithy:** fall back to WARP interface for filtered downloads ([25f0b28](https://github.com/wlix13/NullForge/commit/25f0b28cb7d0efb89cf7710aa922d52a9651c985))
+
+
+### Documentation
+
+* describe WARP download fallback ([8b57441](https://github.com/wlix13/NullForge/commit/8b57441c8ecc234db4f9131e5ab9a603e3384b4c))
+* **site:** add documentation ([d6b8575](https://github.com/wlix13/NullForge/commit/d6b857541d8ed35a5fe8fa3a32cdef95d8d8bf8c))
+
 ## [0.2.0](https://github.com/wlix13/NullForge/compare/v0.1.0...v0.2.0) (2026-07-25)
 
 
