@@ -1,10 +1,15 @@
 """HTTP utilities for NullForge."""
 
 import logging
+import shlex
 import urllib.request
+from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from pyinfra.context import host
-from pyinfra.facts.server import Command
+from pyinfra.facts.server import Command, Which
+
+from nullforge.molds import FeaturesMold
 
 
 LOG = logging.getLogger("pyinfra")
@@ -26,26 +31,64 @@ CURL_ARGS = {
 }
 """Robust curl options for reliable downloads."""
 
-CURL_ARGS_STR = " ".join((*CURL_FLAGS, *(f"{k} {v}" for k, v in CURL_ARGS.items())))
-"""String representation of curl arguments."""
+WARP_TRACE_URL = "https://www.cloudflare.com/cdn-cgi/trace"
+"""Reports `warp=on` when the request egressed through WARP."""
 
 GITHUB_KEYS_URL = "https://github.com/{user}.keys"
 """Public endpoint serving user's authorized SSH public keys."""
 
 
+@dataclass(frozen=True)
+class Egress:
+    """Path a download takes off this host."""
+
+    interface: str | None = None
+    resolve: str | None = None
+
+    def curl_args(self) -> dict[str, str]:
+        args: dict[str, str] = {}
+        if self.interface:
+            args["--interface"] = self.interface
+        if self.resolve:
+            args["--resolve"] = self.resolve
+        return args
+
+
+def _command_output(command: str) -> str:
+    return str(host.get_fact(Command, command, _sudo=True) or "").strip()
+
+
+def _has_curl() -> bool:
+    cache_key = "_nullforge_has_curl"
+    if not hasattr(host.data, cache_key):
+        setattr(host.data, cache_key, bool(host.get_fact(Which, command="curl", _sudo=True)))
+    return getattr(host.data, cache_key)
+
+
+def _reaches(url: str, egress: Egress) -> bool:
+    opts = " ".join(f"{key} {shlex.quote(value)}" for key, value in egress.curl_args().items())
+    probe = (
+        f"curl -sS -o /dev/null -L -r 0-0 --connect-timeout 5 --max-time 15 --proto =https {opts} {shlex.quote(url)}"
+    )
+    return bool(_command_output(f"{probe} >/dev/null 2>&1 && echo reachable || true"))
+
+
 def reachable_address(hostname: str, port: int = 443) -> str | None:
     """First address of `hostname` this host can actually talk HTTPS to, if any."""
 
-    cache_key = f"_nullforge_reachable_{hostname}"
+    cache_key = f"_nullforge_reachable_{hostname}:{port}"
     if hasattr(host.data, cache_key):
         return getattr(host.data, cache_key)
 
     address = None
-    listed = host.get_fact(Command, f"getent ahostsv4 {hostname} | awk '{{print $1}}' | sort -u || true")
-    for candidate in str(listed or "").split():
+    listed = _command_output(f"getent ahostsv4 {hostname} | awk '{{print $1}}' | sort -u || true")
+    for candidate in listed.split():
         # HTTPS answer proves path works; status code is irrelevant
-        probe = f"curl -sS -o /dev/null --connect-timeout 5 --resolve {hostname}:{port}:{candidate} https://{hostname}/"
-        if str(host.get_fact(Command, f"{probe} >/dev/null 2>&1 && echo reachable || true") or "").strip():
+        probe = (
+            f"curl -sS -o /dev/null --connect-timeout 5 --max-time 15 "
+            f"--resolve {hostname}:{port}:{candidate} https://{hostname}/"
+        )
+        if _command_output(f"{probe} >/dev/null 2>&1 && echo reachable || true"):
             address = candidate
             break
 
@@ -53,9 +96,67 @@ def reachable_address(hostname: str, port: int = 443) -> str | None:
     return address
 
 
-def pin_host_args(hostname: str, port: int = 443) -> dict[str, str]:
-    address = reachable_address(hostname, port)
-    return {"--resolve": f"{hostname}:{port}:{address}"} if address else {}
+def warp_interface() -> str | None:
+    """WARP interface confirmed to carry egress, if `features.warp` is active."""
+
+    cache_key = "_nullforge_warp_interface"
+    if hasattr(host.data, cache_key):
+        return getattr(host.data, cache_key)
+
+    iface = None
+    features = getattr(host.data, "features", None)
+    if isinstance(features, FeaturesMold) and features.warp.is_active:
+        candidate = features.warp.iface
+        trace = (
+            f"curl -sS --interface {shlex.quote(candidate)} --connect-timeout 5 --max-time 10 {WARP_TRACE_URL}"
+            " 2>/dev/null | grep -E '^warp=(on|plus)$' || true"
+        )
+        if _command_output(trace):
+            iface = candidate
+
+    setattr(host.data, cache_key, iface)
+    return iface
+
+
+def egress_for(url: str, *, pin_host: str | None = None) -> Egress:
+    """Default route pinned to an answering address of `pin_host` (the URL's host by default), else WARP."""
+
+    pin_host = pin_host or urlparse(url).hostname or ""
+    cache_key = f"_nullforge_egress_{pin_host}|{url}"
+    if hasattr(host.data, cache_key):
+        return getattr(host.data, cache_key)
+
+    egress = Egress()
+    if _has_curl():
+        address = reachable_address(pin_host) if pin_host else None
+        if address:
+            egress = Egress(resolve=f"{pin_host}:443:{address}")
+        if not (address and _reaches(url, egress)):
+            iface = warp_interface()
+            if iface and _reaches(url, Egress(interface=iface)):
+                egress = Egress(interface=iface)
+                LOG.info(f"[{host.name}] {url} is unreachable directly, downloading via WARP interface '{iface}'")
+            else:
+                LOG.warning(f"[{host.name}] {url} is unreachable {'directly and via WARP' if iface else 'directly'}")
+
+    setattr(host.data, cache_key, egress)
+    return egress
+
+
+def curl_args(url: str, *, pin_host: str | None = None) -> dict[str, str]:
+    return {
+        **CURL_ARGS,
+        **egress_for(url, pin_host=pin_host).curl_args(),
+    }
+
+
+def curl_args_str(url: str) -> str:
+    return " ".join(
+        (
+            *CURL_FLAGS,
+            *(f"{key} {shlex.quote(value)}" for key, value in curl_args(url).items()),
+        )
+    )
 
 
 def fetch_text(url: str, *, timeout: int = 10, headers: dict[str, str] | None = None) -> str:

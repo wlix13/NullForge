@@ -26,6 +26,17 @@ WARP gives the host a Cloudflare-terminated tunnel interface without changing th
 - Registers a WARP account and generates the profile on first run, then post-processes it: the `DNS` line is dropped (resolver stays under [DNS](dns.md) control) and `Table = off` is added so no default route is installed.
 - Failed registration (rate limiting) skips the dependent steps instead of half-configuring; the next cast retries.
 
+## Downloads through WARP
+
+Every `curl` NullForge itself runs on the host - release binaries, installer scripts, geo databases - is probed at plan time with a one-byte request over the default route.
+When that probe fails and WARP is active on the host, the probe is repeated through the WARP interface; if Cloudflare confirms the interface carries WARP egress, the download binds to it (`curl --interface`), so a filtered uplink that blocks GitHub or similar no longer breaks release-binary and installer-script downloads.
+
+- The direct route always wins when it works: WARP is a fallback, never a detour.
+- The direct probe pins the URL's host (the release-asset host, for GitHub releases) to an address that answers, since a filtered uplink often blocks only some of a host's addresses; when none answers, WARP is tried straight away.
+- Decisions are cached per URL for the cast; facts are gathered before operations run, so a cast that installs WARP itself still downloads directly - the fallback is available from the next cast, provided WARP's own binary download got through.
+- Hosts without `curl` are not probed (pyinfra downloads with `wget` there).
+- Package managers, APT keyrings, `git` clones (oh-my-zsh, plugins, TPM, NvChad), and downloads made from inside third-party install scripts (starship, zoxide, atuin, Docker, Xray, Nezha) are not affected.
+
 ## Configuration (`features.warp`)
 
 | Field | Default | Description |

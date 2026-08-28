@@ -6,6 +6,7 @@ import pytest
 
 from nullforge.smithy.versions import (
     DEFAULT_VERSIONS,
+    RELEASE_ASSET_HOST,
     VERSION_MARKER_DIR,
     Versions,
     is_pinned_version_installed,
@@ -54,6 +55,14 @@ class TestArchSelect:
         with _versions_context("riscv64") as v:
             with pytest.raises(ValueError, match="Unsupported architecture"):
                 v._arch_select("amd64", "arm64")
+
+
+class TestReleaseCurlArgs:
+    def test_pins_the_release_asset_host(self) -> None:
+        url = "https://github.com/o/r/releases/download/v1/tool.tar.gz"
+        with patch("nullforge.smithy.versions.curl_args", return_value={"--retry": "3"}) as args:
+            assert Versions.release_curl_args(url) == {"--retry": "3"}
+        args.assert_called_once_with(url, pin_host=RELEASE_ASSET_HOST)
 
 
 class TestVersionsUrls:

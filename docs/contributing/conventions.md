@@ -45,6 +45,12 @@ Keep the guard at the call site: checksum resolution makes a plan-time API call,
 
 Non-fitting installers stay custom: source builds (tmux), AppImage-to-directory extraction (nvim), and non-GitHub / `latest` / multi-binary downloads (gVisor).
 
+## Downloads
+
+Every `curl` NullForge runs on a target takes its options from `smithy.http.curl_args(url)` - `curl_args_str(url)` for hand-written commands, `Versions.release_curl_args(url)` for GitHub release assets - never the bare `CURL_ARGS` dict.
+The helpers probe the URL at plan time and fall back to the [WARP interface](../features/warp.md#downloads-through-warp) when the direct route is filtered, so a DPI-blocked uplink does not break installs.
+Because the probe is a live request, call them behind the install guard - like `install_release_binary()` - not for downloads that will be no-ops.
+
 ## Fact handling
 
 Don't wrap `host.get_fact(...)` in `contextlib.suppress` - facts never raise to the caller, so the guard is dead code.

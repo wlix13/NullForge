@@ -7,7 +7,7 @@ from pyinfra.operations import python, server, systemd
 
 from nullforge.molds.monitoring import NezhaBackend
 from nullforge.molds.system import SystemMold
-from nullforge.smithy.http import CURL_ARGS_STR
+from nullforge.smithy.http import curl_args_str
 from nullforge.smithy.versions import STATIC_URLS
 
 from .agent import agent_uuid_for_hostname, build_nezha_install_command
@@ -35,7 +35,7 @@ def deploy_nezha(cfg: NezhaBackend) -> None:
     if not host.get_fact(File, layout.config_path):
         install_command = build_nezha_install_command(
             install_url=STATIC_URLS["nezha_agent_install"],
-            curl_args=CURL_ARGS_STR,
+            curl_args=curl_args_str(STATIC_URLS["nezha_agent_install"]),
             server=cfg.server,
             tls=cfg.tls,
             client_secret=cfg.client_secret,

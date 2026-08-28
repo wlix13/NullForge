@@ -9,7 +9,7 @@ from pyinfra.operations import files, git, server
 from nullforge.models.profiles import NerdFont
 from nullforge.molds import FeaturesMold, ProfilesMold, UserMold
 from nullforge.smithy.github import sha256_for_download_url
-from nullforge.smithy.http import CURL_ARGS
+from nullforge.smithy.http import curl_args
 from nullforge.smithy.install import install_release_binary
 from nullforge.smithy.packages import get_pm
 from nullforge.smithy.versions import STATIC_URLS, ZSH_PLUGINS, Versions, get_versions, is_pinned_version_installed
@@ -212,7 +212,7 @@ def _install_nerd_font(user: str, home_dir: str, family: NerdFont, reinstall: bo
         dest=archive_path,
         force=True,
         sha256sum=sha256_for_download_url(url),
-        extra_curl_args=Versions.release_curl_args(),
+        extra_curl_args=Versions.release_curl_args(url),
         _sudo=True,
         _sudo_user=user,
         _retries=3,
@@ -368,7 +368,7 @@ def _install_starship_from_script() -> None:
         src=STATIC_URLS["starship_install"],
         dest=starship_install_path,
         mode="0755",
-        extra_curl_args=CURL_ARGS,
+        extra_curl_args=curl_args(STATIC_URLS["starship_install"]),
         _sudo=True,
         _retries=3,
         _retry_delay=10,
@@ -394,7 +394,7 @@ def _install_atuin(user: str, home_dir: str, reinstall: bool = False) -> None:
         src=STATIC_URLS["atuin_install"],
         dest=atuin_install_path,
         mode="0755",
-        extra_curl_args=CURL_ARGS,
+        extra_curl_args=curl_args(STATIC_URLS["atuin_install"]),
         _sudo=True,
         _retries=3,
         _retry_delay=10,
@@ -420,7 +420,7 @@ def _install_zoxide(reinstall: bool = False) -> None:
         src=STATIC_URLS["zoxide_install"],
         dest=zoxide_install_path,
         mode="0755",
-        extra_curl_args=CURL_ARGS,
+        extra_curl_args=curl_args(STATIC_URLS["zoxide_install"]),
         _sudo=True,
         _retries=3,
         _retry_delay=10,
@@ -471,13 +471,14 @@ def _install_tmux(reinstall: bool = False) -> None:
     versions = get_versions()
     tmux_tar_path = "/tmp/tmux.tar.gz"
     tmux_src_dir = f"/tmp/tmux-{versions.versions['tmux']}"
+    tmux_url = versions.tmux_tar()
 
     files.download(
         name="Download tmux source",
-        src=versions.tmux_tar(),
+        src=tmux_url,
         dest=tmux_tar_path,
         force=True,
-        extra_curl_args=get_versions().release_curl_args(),
+        extra_curl_args=versions.release_curl_args(tmux_url),
         _retries=3,
         _retry_delay=10,
     )
@@ -527,13 +528,14 @@ def _install_nvim(reinstall: bool = False) -> None:
     )
 
     nvim_appimage_path = "/tmp/nvim.appimage"
+    nvim_url = get_versions().nvim_appimage()
     files.download(
         name="Download nvim appimage",
-        src=get_versions().nvim_appimage(),
+        src=nvim_url,
         dest=nvim_appimage_path,
         mode="0755",
         force=True,
-        extra_curl_args=get_versions().release_curl_args(),
+        extra_curl_args=get_versions().release_curl_args(nvim_url),
         _sudo=True,
         _retries=3,
         _retry_delay=10,
