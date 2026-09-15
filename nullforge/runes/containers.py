@@ -29,6 +29,7 @@ def deploy_containers() -> None:
         case ContainersBackendType.PODMAN:
             _install_crun()
             _install_podman()
+            _enable_podman_autoupdate(user_opts)
         case ContainersBackendType.CRIO:
             raise ValueError("CRIO is not supported yet")
 
@@ -197,6 +198,34 @@ def _install_podman() -> None:
         packages=[
             "podman",
             "podman-compose",
+            "passt",
+            "uidmap",
+        ],
+        _sudo=True,
+    )
+
+
+def _enable_podman_autoupdate(user_opts: UserMold) -> None:
+    """Enable podman auto-update timer, rootful and rootless."""
+
+    systemd.service(
+        name="Enable podman auto-update timer",
+        service="podman-auto-update.timer",
+        running=True,
+        enabled=True,
+        _sudo=True,
+    )
+
+    if not user_opts.manage:
+        return
+
+    user = user_opts.name
+    server.shell(
+        name=f"Enable rootless podman auto-update timer for {user}",
+        commands=[
+            f"loginctl enable-linger {user}",
+            f"runuser -u {user} -- env XDG_RUNTIME_DIR=/run/user/$(id -u {user})"
+            " systemctl --user enable --now podman-auto-update.timer",
         ],
         _sudo=True,
     )
