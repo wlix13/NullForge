@@ -36,6 +36,7 @@ RHEL_OVERRIDES = {
     "pkg-config": "pkgconfig",
     "python3-dev": "python3-devel",
     "software-properties-common": None,
+    "uidmap": "shadow-utils",
     "ufw": "firewalld",
 }
 """Package overrides for RHEL/CentOS/Fedora families
