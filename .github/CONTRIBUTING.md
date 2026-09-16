@@ -85,6 +85,40 @@ If any hooks fail, please fix the issues before committing. You can manually run
 prek run --all-files
 ```
 
+### Tasks (via poe)
+
+Every routine check, build and test step is a [poe](https://poethepoet.natn.io/) task, and CI runs the same tasks you do.
+Tasks run through poe's `uv` executor, so they resolve their own environment - no `uv run --group ...` prefix needed.
+The bare name is the variant CI runs; a colon suffix selects a mode (`:fix` for auto-fix, `:dev` for the local loop):
+
+```bash
+uv sync                    # create the environment
+uv run poe check           # format + lint + typecheck + lint-imports + deptry (what CI runs)
+uv run poe format          # ruff format --check
+uv run poe format:fix      # ruff format
+uv run poe lint            # ruff check
+uv run poe lint:fix        # ruff check --fix
+uv run poe lint:md         # markdownlint over all Markdown (via prek)
+uv run poe typecheck       # ty check
+uv run poe lint-imports    # import-linter layer contracts
+uv run poe deptry          # dependency hygiene
+uv run poe tests           # pytest with coverage
+uv run poe docs            # strict docs site build (what docs CI runs)
+uv run poe docs:dev        # serve the docs site with live reload
+```
+
+Run `uv run poe check` and `uv run poe tests` before pushing - they are the same checks the pull request runs.
+Markdown is not in `poe check` - the prek hook lints it on every commit and in CI; `uv run poe lint:md` runs it on demand.
+`poe check` does not build the documentation site either, so run `uv run poe docs` when the change touches `docs/`.
+
+### Tests
+
+`uv run poe tests` runs the suite; CI runs it on Python 3.13, 3.14 and 3.15.
+`tests/conftest.py` patches the pyinfra context so rune and operation calls are no-ops - molds, smithy helpers, runes, and templates unit-test without a real target.
+End-to-end correctness is still validated by deploying to a real host.
+
+The suite also enforces the [conventions](https://wlix13.github.io/NullForge/contributing/conventions/): operation-emitting loops must go through `host.loop`, and import contracts reject cross-layer imports.
+
 ## Commits
 
 All commits are expected to follow the conventional commits specification.
