@@ -60,7 +60,7 @@ Telegram-bound egress is routed through WARP (enabled above) via per-uid policy 
 and the MEKO SYN rate-limiting fix is applied.
 """
 
-overrides = (
+_overrides = (
     users,
     warp,
     dns,
@@ -74,14 +74,14 @@ hosts = [
         "203.0.113.10",
         {
             "system": merge_system(BASE_SYSTEM, {"hostname": "example-node1.local"}),
-            "features": merge_features(BASE_FEATURES, *overrides),
+            "features": merge_features(BASE_FEATURES, *_overrides),
         },
     ),
     (
         "203.0.113.20",
         {
             "system": merge_system(BASE_SYSTEM, {"hostname": "example-node2.local"}),
-            "features": merge_features(BASE_FEATURES, *overrides),
+            "features": merge_features(BASE_FEATURES, *_overrides),
         },
     ),
 ]
