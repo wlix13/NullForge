@@ -22,7 +22,6 @@ Switching modes converges: `dot_resolved` stops and disables the Blocky services
   Wildcard and loopback addresses use existing interfaces.
 - Renders `/etc/blocky/config.yaml` with DoH upstreams from the selected provider (IPv6 upstreams included only when the host has IPv6).
 - Points `/etc/resolv.conf` directly at the Blocky address, replacing any symlink.
-- Restarts Blocky only when the binary, config, or unit changed.
 
 ### `dot_resolved`
 

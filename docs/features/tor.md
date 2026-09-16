@@ -8,7 +8,7 @@ A local [Tor](https://www.torproject.org) SOCKS proxy with DNS resolution.
 
 - The distro's `tor` package.
 - A rendered `/etc/tor/torrc` exposing a SOCKS listener and a DNSPort.
-- Restarts Tor only when the config changed; always ensures the service is running and enabled.
+- Ensures the service is running and enabled.
 
 The listeners bind locally - combine with your own firewall rules if you need to expose them.
 

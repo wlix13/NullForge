@@ -25,5 +25,3 @@ Turning a default-on feature off is a one-line layer:
 ```python
 merge_features(BASE_FEATURES, {"dns": {"mode": "none"}, "profiles": {"for_root": False}})
 ```
-
-Every page in this section documents the feature's behaviour, its configuration fields with defaults, and an inventory fragment to start from.

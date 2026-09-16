@@ -59,7 +59,7 @@ if getattr(host.data, "zone", None) == "web":
     ...  # zone-specific provisioning
 ```
 
-The deploy repo of the **Conglomerate** proxy fleet uses this shape for a repo-local automation rune: it provisions a CI user, then derives that user's sudoers entries and ACL grants from whichever features are active on each host.
+The [Conglomerate](https://github.com/wl-Conglomerate) fleet's automation rune uses this shape: a CI user whose sudoers entries and ACL grants follow the active features.
 
 ## Useful smithy helpers
 
@@ -76,4 +76,4 @@ The deploy repo of the **Conglomerate** proxy fleet uses this shape for a repo-l
 
 ## Rules that keep casts stable
 
-Custom runes follow the same [conventions](../contributing/conventions.md) as built-ins - `host.loop` for operation-emitting loops, `OperationMeta` change-detection guards, and fact- or [pin](version-pinning.md)-guarded installs.
+Custom runes follow the same [conventions](../contributing/conventions.md) as built-ins.

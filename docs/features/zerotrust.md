@@ -9,7 +9,6 @@ Publishes services through a [Cloudflare Tunnel](https://developers.cloudflare.c
 - The pinned `cloudflared` binary, run as a dedicated `cloudflare` service user.
 - `/etc/cloudflare/tunnel.yml` (mode `0600`) with the tunnel token, protocol, HA connection count, and post-quantum setting.
 - A `cloudflare-tunnel` systemd unit; with `route_through_warp`, a helper script routes tunnel traffic out through the [WARP](warp.md) interface and the unit orders itself after the WARP service.
-- Restarts only when the binary, config, unit, or routing script changed.
 
 Create the tunnel and copy its token from the Cloudflare Zero Trust dashboard (or `cloudflared tunnel create`); NullForge runs the connector, it does not create tunnels.
 

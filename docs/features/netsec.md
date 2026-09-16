@@ -8,7 +8,7 @@ SSH hardening, a default-deny firewall, and kernel network tuning.
 
 Directives edited in `/etc/ssh/sshd_config`:
 
-- `PasswordAuthentication no` - only when [`users.manage`](users.md) is true; keep one of the user's [SSH key sources](users.md) enabled or the host becomes unreachable over SSH.
+- `PasswordAuthentication no` - only when [`users.manage`](users.md) is true.
 - `PermitRootLogin no`
 - `UseDNS yes`
 
@@ -18,16 +18,15 @@ Key material and key exchange go into a drop-in at `/etc/ssh/sshd_config.d/40-nu
 - **Post-quantum KEX** - with `pq_kex_priority`, hybrid PQ algorithms (`mlkem768x25519-sha256`, `sntrup761x25519-sha512`) are preferred ahead of strong classical ones, filtered to what the target's OpenSSH supports.
 - **Weak-algorithm stripping** - with `strip_weak_algorithms`, weak KEX patterns, weak MACs, and `ssh-rsa` CA signatures are removed, and sub-3072-bit DH group-exchange moduli are dropped from `/etc/ssh/moduli`.
 
-Every config change is validated with `sshd -t` before the daemon restarts; the restart only happens when something actually changed, so re-casts never bounce sshd.
+Every config change is validated with `sshd -t` before the daemon restarts.
 
 ## Firewall
 
 UFW on Debian/Ubuntu, firewalld on RHEL.
-The desired ruleset is fingerprinted (order-independent SHA-256, persisted on the host); when the fingerprint matches and the firewall is active, the whole section is skipped.
+The desired ruleset is fingerprinted; when the fingerprint matches and the firewall is active, the whole section is skipped.
 On any rule change the ruleset is reset and reapplied from scratch - the inventory is the single source of truth, and rules added by hand are wiped.
 
 Default policies: **incoming denied**, outgoing allowed, plus one rule allowing SSH on port 22.
-UFW additionally sets its forward policy to allow; firewalld keeps its own forwarding defaults.
 
 Rules with IPv6 addresses are silently skipped on hosts without IPv6 connectivity.
 
@@ -46,7 +45,6 @@ Rules with IPv6 addresses are silently skipped on hosts without IPv6 connectivit
 !!! warning "firewalld limitations"
 
     `direction="out"` and `action="limit"` rules raise an error on RHEL - firewalld has no equivalents.
-    Simple allows become `--add-port`; everything else becomes rich rules; the `public` zone target is set to `DROP`.
 
 !!! warning "Replacing rules replaces the SSH rule too"
 
@@ -60,7 +58,7 @@ Four opinionated groups, each persisted to its own file under `/etc/sysctl.d/`:
 | Group | Highlights |
 | --- | --- |
 | `system_sysctl` | file-handle limits, `vm.swappiness=10` |
-| `conntrack_sysctl` | shortened TCP/UDP conntrack timeouts; `nf_conntrack_max` sized from RAM at deploy time (skipped when the module isn't loaded) |
+| `conntrack_sysctl` | shortened TCP/UDP conntrack timeouts; `nf_conntrack_max` sized from RAM at deploy time |
 | `ipv4_sysctl` | BBR + fq, large buffers and backlogs, TCP Fast Open, keepalive tuning |
 | `ipv6_sysctl` | neighbor-table sizing; applied only when the host has IPv6 |
 

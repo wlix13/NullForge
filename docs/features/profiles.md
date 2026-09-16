@@ -23,12 +23,11 @@ Applied to root (`for_root`), the [managed user](users.md) (`for_user`), or both
 
 - **oh-my-zsh** plus plugins: `zsh-autosuggestions`, `zsh-syntax-highlighting`, `ohmyzsh-full-autoupdate`.
 - **`.zshrc`** - the generated part lives in a marked block (`# ... NULLFORGE MANAGED BLOCK`) *prepended* to the file, so your own lines stay below and win.
-  Everything outside the markers survives re-deploys.
 - **starship** prompt config and **direnv** config under `~/.config`.
 - **tmux** - TPM plugin manager plus a config in `~/.config/tmux`.
 - **neovim** - [NvChad](https://nvchad.com) starter with a cursor-restore patch and the `tokyonight` theme; skipped when a `chadrc.lua` already exists so your editor config is never clobbered.
 - **atuin** shell history.
-- **Nerd Font** (optional) - one family from the [`nerd-fonts`](https://github.com/ryanoasis/nerd-fonts) release, installed to `~/.local/share/fonts` in a versioned directory, `fc-cache` refreshed.
+- **Nerd Font** (optional) - one family from the [`nerd-fonts`](https://github.com/ryanoasis/nerd-fonts) release.
 
 !!! note "First deploy on a pre-existing `.zshrc`"
 

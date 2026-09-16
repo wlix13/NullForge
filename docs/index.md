@@ -52,21 +52,4 @@ Opt in per host:
 
 See the [feature reference](features/index.md) for the full activation matrix.
 
-## How it fits together
-
-```mermaid
-flowchart LR
-    I[Inventories] --> F["Foundry<br/>cast_full()"]
-    F --> R[Runes]
-    R --> S[Smithy]
-    R --> T[Templates]
-    M[Molds] --> I
-    M --> R
-    D[Models] --> M
-```
-
-Inventories attach `system` and `features` data to each host.
-The foundry validates that data through the molds, then includes the rune for every active feature.
-Runes read their configuration from `host.data` and lean on the smithy for cross-distro package logic and pinned-binary installs.
-
 Start with the [installation guide](getting-started/installation.md), then walk through the [quickstart](getting-started/quickstart.md).

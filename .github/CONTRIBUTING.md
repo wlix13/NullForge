@@ -87,7 +87,7 @@ prek run --all-files
 
 ### Tasks (via poe)
 
-Every routine check, build and test step is a [poe](https://poethepoet.natn.io/) task, and CI runs the same tasks you do.
+Every routine check, build and test step is a [poe](https://poethepoet.natn.io/) task.
 Tasks run through poe's `uv` executor, so they resolve their own environment - no `uv run --group ...` prefix needed.
 The bare name is the variant CI runs; a colon suffix selects a mode (`:fix` for auto-fix, `:dev` for the local loop):
 
@@ -117,7 +117,7 @@ Markdown is not in `poe check` - the prek hook lints it on every commit and in C
 `tests/conftest.py` patches the pyinfra context so rune and operation calls are no-ops - molds, smithy helpers, runes, and templates unit-test without a real target.
 End-to-end correctness is still validated by deploying to a real host.
 
-The suite also enforces the [conventions](https://wlix13.github.io/NullForge/contributing/conventions/): operation-emitting loops must go through `host.loop`, and import contracts reject cross-layer imports.
+The suite also enforces the [conventions](https://wlix13.github.io/NullForge/contributing/conventions/).
 
 ## Commits
 
@@ -147,8 +147,7 @@ message — please replace that with something descriptive. Examples:
 - `Improve CI/CD caching and test matrix`
 - `Fix swap sizing on small hosts`
 
-A good title reads cleanly in the PR list and the project history. The individual
-**commits** inside the PR still follow Conventional Commits (see [Commits](#commits));
+The individual **commits** inside the PR still follow Conventional Commits (see [Commits](#commits));
 because PRs are merged with a merge/rebase strategy, those commit messages — not the
 title — drive the release changelog, so the title itself does not need a `type:` prefix.
 

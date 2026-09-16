@@ -44,20 +44,15 @@ common = (
 features = merge_features(BASE_FEATURES, *common, {"dns": {"ecs": True}})
 ```
 
-The set of allowed sub-mold types is derived from `FeaturesMold.model_fields`, so a new feature is mergeable without touching the merge logic.
-
 !!! warning "Deep-merge is per-key"
 
     Dictionaries merge recursively, but any non-dict value - including lists - replaces the previous value outright.
     A layer that sets `netsec.firewall_rules` replaces the whole rule list; extend `BASE_FEATURES.netsec.firewall_rules` in Python if you want "default rules plus mine".
 
-Because inventories are Python, you can factor shared preset tuples, per-environment modules, or host loops however you like - the only contract is the final `hosts` list.
-
 ## Validation and coercion
 
-The foundry coerces whatever the inventory provided - `None`, a `dict`, or a mold instance - into validated `SystemMold` / `FeaturesMold` objects before any rune runs (`ensure_system` / `ensure_features`).
+The foundry coerces whatever the inventory provided - `None`, a `dict`, or a mold instance - into validated `SystemMold` / `FeaturesMold` objects before any rune runs.
 Missing keys fall back to mold defaults; unknown keys are rejected because every mold forbids extra fields.
-A typo like `{"warp": {"instal": True}}` fails the cast at validation time, before anything touches a host.
 
 ## Scaling to a fleet
 
@@ -143,20 +138,12 @@ for zone in ZONE_FEATURES:
 nullforge cast -i inventory/main.py --limit web --dry
 ```
 
-Details worth stealing:
-
-- `entry.get("overrides")` is either a dict fragment or `None` - both are valid `merge_features` layers, so per-host overrides cost one line and still go through mold validation.
-- Extra data keys (like `zone` above) ride along on `host.data` untouched; [custom runes](../guides/custom-runes.md) can branch on them.
-- Adding a host is a YAML edit, reviewable in a PR and scriptable from CI.
-
-This is the pattern behind the deploy repo of the **Conglomerate** proxy fleet: zone presets over NullForge molds, a YAML host registry edited from CI workflows, and per-zone `--limit` casts.
-
 ## Secrets in inventories
 
 Inventories are code; secrets in them (tunnel tokens, proxy user secrets) end up on disk.
 Keep real inventories out of public repos, or load secrets from the environment.
 
-Mold fields marked sensitive (user password, Zero Trust token, Nezha secrets, Telemt users) are redacted as `***` in pyinfra's `--debug-inventory` output, so inspecting a plan does not leak them.
+Sensitive mold fields are redacted as `***` in pyinfra's `--debug-inventory` output, so inspecting a plan does not leak them.
 
 ## Debugging
 

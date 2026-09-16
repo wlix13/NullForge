@@ -16,8 +16,6 @@ A cast converges every host to the pin; bumping a pin re-installs on the next ca
 | `blocky` | [DNS](../features/dns.md) |
 | `telemt` | [Telemt](../features/telemt.md) |
 
-Run `nullforge runes` from a checkout - or read the file - for the exact current pins.
-
 ## Overriding per host
 
 Inventory data key `versions` overlays the defaults:
@@ -52,7 +50,6 @@ Installers check `is_pinned_version_installed(tool, binary_path)` before doing a
 
 Only when the guard fails does the installer download - which is also when the release's sha256 is resolved from GitHub metadata on the control node and verified on the target.
 Checksum resolution is best-effort: a repo that publishes no checksums installs unverified (a warning is logged).
-The download falls back to the [WARP interface](../features/warp.md#downloads-through-warp) when the direct route is filtered and the host has WARP.
 
 ## Not pin-driven
 
