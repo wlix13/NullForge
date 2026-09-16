@@ -5,7 +5,7 @@ Nothing is installed on the targets beforehand - a root or sudo-capable SSH logi
 
 ## Requirements
 
-- **Control node** - Python 3.13 and [uv](https://docs.astral.sh/uv/).
+- **Control node** - Python 3.13, 3.14 or 3.15, and [uv](https://docs.astral.sh/uv/).
 - **Targets** - Debian or Ubuntu (primary), RHEL-family (Rocky, Alma, CentOS, Fedora - supported where noted per feature), reachable over SSH.
 
 ## As a CLI tool

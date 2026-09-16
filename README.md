@@ -1,7 +1,7 @@
 # NullForge
 
 [![PyPI](https://img.shields.io/pypi/v/nullforge?logo=pypi&logoColor=white)](https://pypi.org/project/nullforge/)
-![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/python-3.13%20%7C%203.14%20%7C%203.15-blue?logo=python&logoColor=white)
 ![Build](https://img.shields.io/github/actions/workflow/status/wlix13/NullForge/ci-tests.yaml?label=build&logo=github)
 ![Lint](https://img.shields.io/github/actions/workflow/status/wlix13/NullForge/ci-code-quality.yaml?label=lint&logo=github)
 ![License](https://img.shields.io/badge/license-MIT-green)
