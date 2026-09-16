@@ -618,6 +618,9 @@ dev = [
     { name = "import-linter" },
     { name = "poethepoet" },
     { name = "prek" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-sugar" },
     { name = "ruff" },
     { name = "ty" },
 ]
@@ -645,6 +648,9 @@ dev = [
     { name = "import-linter" },
     { name = "poethepoet" },
     { name = "prek" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-sugar" },
     { name = "ruff" },
     { name = "ty" },
 ]

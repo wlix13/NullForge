@@ -27,6 +27,7 @@ scripts.nullforge = "nullforge.cli.__main__:main"
 
 [dependency-groups]
 dev = [
+  { include-group = "tests" },
   "deptry",
   "import-linter",
   "poethepoet",
