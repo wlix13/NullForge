@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.1](https://github.com/wlix13/NullForge/compare/v0.3.0...v0.3.1) (2026-09-18)
+
+
+### Features
+
+* **runes:** enhance Podman support with rootless prerequisites and auto-updater ([9c02ab7](https://github.com/wlix13/NullForge/commit/9c02ab7de2196149c500ac6aa3ddd457896af31b))
+
+
+### Bug Fixes
+
+* **docs:** cut repeated and internal detail from docs and contributing guide ([21741ef](https://github.com/wlix13/NullForge/commit/21741efe1a785fc5c3fe3b22b58aaefff43f8e70))
+* **inventories:** keep example presets out of pyinfra group discovery ([73578d6](https://github.com/wlix13/NullForge/commit/73578d65f7ceef892491905cc1c670c2e92f7a04))
+
 ## [0.3.0](https://github.com/wlix13/NullForge/compare/v0.2.0...v0.3.0) (2026-08-28)
 
 
