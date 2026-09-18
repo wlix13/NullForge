@@ -29,6 +29,11 @@ A container runtime with a sandboxed-by-default configuration.
 
 Installs `podman`, `podman-compose`, and the `crun` runtime from distro packages - no scripts, no extra repos.
 
+Rootless prerequisites come along: `passt` (the `pasta` network backend) and `uidmap` on Debian/Ubuntu (`shadow-utils` on RHEL) for `newuidmap`/`newgidmap`.
+
+`podman-auto-update.timer` is enabled system-wide.
+When `users.manage` is on, the [managed user](users.md) also gets lingering enabled (`loginctl enable-linger`) and the same timer enabled in its user session, so rootless containers labelled `io.containers.autoupdate` are refreshed daily.
+
 ## Configuration (`features.containers`)
 
 | Field | Default | Description |
