@@ -58,4 +58,4 @@ The [conventions](../contributing/conventions.md) around `host.loop` and change 
 ## The CLI wrapper
 
 `nullforge cast` is a thin planner around pyinfra: it resolves the [cast stages](../getting-started/cli.md#stages) and hands them to pyinfra.
-Everything else - connections, facts, operations, parallelism - is stock pyinfra, which is why unknown CLI options are proxied through verbatim.
+Everything else is stock pyinfra, which is why unknown CLI options are proxied through verbatim.

@@ -10,7 +10,6 @@ An MTProto proxy for Telegram via [telemt](https://github.com/telemt/telemt), wi
 - `/etc/telemt/telemt.toml` (mode `0640`) rendered from the mold - modes, users, network preferences, timeouts.
 - A systemd unit; with `route_via_warp` (and [WARP](warp.md) active), a per-uid policy-routing helper sends Telegram-bound egress through the WARP interface, and the unit orders itself after the WARP service.
 - With `synfix`, an iptables helper that re-applies a SYN rate-limiting chain on every (re)start; it inserts `RETURN` rules ahead of the firewall, so it coexists with UFW/firewalld.
-- Restarts only when the binary, config, unit, or helper scripts changed.
 
 ## Fake-TLS and the post-quantum check
 

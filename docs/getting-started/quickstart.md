@@ -34,7 +34,7 @@ hosts = [
 
 Replace `your-github-username` with your GitHub account before casting - its public SSH keys become the user's `authorized_keys`.
 
-With no overrides at all, a cast still deploys the [defaults](../features/index.md): base system, network security, an admin user, Blocky DNS, and shell profiles for root.
+With no overrides at all, a cast still deploys the [defaults](../features/index.md).
 
 The bundled [example inventory](https://github.com/wlix13/NullForge/blob/main/nullforge/inventories/example.py) shows a fuller setup with WARP, monitoring, and an MTProto proxy.
 

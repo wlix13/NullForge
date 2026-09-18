@@ -15,10 +15,10 @@ Fresh images without `sudo`: use [`--with-prepare`](../getting-started/cli.md#st
 
 Deploys the system baseline, in order:
 
-1. **IPv6 stack** - when `ensure_ipv6` is set and GRUB carries `ipv6.disable=...`, strips it and regenerates the GRUB config (Debian `update-grub` or RHEL `grub2-mkconfig`).
+1. **IPv6 stack** - when `ensure_ipv6` is set and GRUB carries `ipv6.disable=...`, strips it and regenerates the GRUB config.
 2. **Hostname** - sets the hostname, writes it to `/etc/hosts` with the host's primary IP, and pins `preserve_hostname: true` in cloud-init so reboots keep it.
 3. **Packages** - refreshes and upgrades, then installs `packages_base` (names are [mapped per distro](../concepts/architecture.md)).
-4. **curl** - installs a pinned static `curl` to `/usr/local/bin` (removing the distro package on Debian, symlinking the CA bundle path on RHEL); falls back to the repo package when no static build fits the architecture.
+4. **curl** - installs a pinned static `curl` to `/usr/local/bin`; falls back to the repo package when no static build fits the architecture.
 5. **doggo** - a pinned DNS client for debugging resolvers.
 6. **Locales** - resolves each requested locale against what the target can generate, enables it in `/etc/locale.gen`, and runs `locale-gen` when needed.
 7. **Timezone** and **NTP** - `systemd-timesyncd` on Debian/Ubuntu, `chrony` (with a forced initial sync) on RHEL.
@@ -35,7 +35,7 @@ Deploys the system baseline, in order:
 | `swap` | see below | Swap configuration |
 | `ensure_ipv6` | `true` | Repair a GRUB-disabled IPv6 kernel stack |
 
-`hostname` is validated as a proper FQDN (labels, length, charset) at plan time.
+`hostname` is validated as a proper FQDN at plan time.
 
 ### Swap (`system.swap`)
 
@@ -52,7 +52,7 @@ The two types are mutually exclusive - enabling one dismantles the other, so swi
 !!! note "swappiness vs netsec"
 
     [Network security](netsec.md) also sets `vm.swappiness` (default `10`) in its sysctl group.
-    With swap enabled, the swap value is the effective one - its sysctl file sorts later; keep the two intentionally aligned.
+    With swap enabled, the swap value is the effective one - keep the two intentionally aligned.
 
 ## Example
 

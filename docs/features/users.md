@@ -8,7 +8,7 @@ Creates and maintains the host's admin user.
 
 - Creates the user with the configured shell and a home directory, appending it to the sudo group (`sudo` on Debian/Ubuntu, `wheel` on RHEL) when `sudo` is set.
 - **Password**: applied when set; with no password and `sudo` on, passwordless sudo is configured via `/etc/sudoers.d/<name>`.
-- **SSH keys**: merges keys copied from the connecting user's `authorized_keys` (root's, in the usual root bootstrap - hence `copy_root_keys`) and/or fetched from a GitHub account, deduplicates them, and installs them with correct ownership and modes (plus a `~/.ssh/sockets` directory for multiplexing).
+- **SSH keys**: merges keys copied from the connecting user's `authorized_keys` and/or fetched from a GitHub account, deduplicates them, and installs them with correct ownership and modes.
 - Optionally sets root's shell to match the user's.
 
 ## Configuration (`features.users`)
@@ -33,7 +33,7 @@ Creates and maintains the host's admin user.
 
 ## Interactions
 
-- [Network security](netsec.md) disables SSH password authentication (and root login) when `users.manage` is true - keep at least one key source enabled so you can still log in.
+- [Network security](netsec.md) disables SSH password authentication (and root login) when `users.manage` is true.
 - [Containers](containers.md) adds this user to the `docker` group.
 - [Shell profiles](profiles.md) with `for_user = true` provisions this user's shell environment.
 - [HAProxy](haproxy.md) and [Xray](xray.md) grant this user ACL access to their config directories.

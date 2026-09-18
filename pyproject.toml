@@ -8,10 +8,12 @@ description = "Forge the server's baseline from null"
 readme = "README.md"
 maintainers = [ { name = "wlix13", email = "github@wlix13.dev" } ]
 authors = [ { name = "wlix13", email = "github@wlix13.dev" } ]
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.13"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
 ]
 dynamic = [ "version" ]
 dependencies = [
@@ -25,6 +27,7 @@ scripts.nullforge = "nullforge.cli.__main__:main"
 
 [dependency-groups]
 dev = [
+  { include-group = "tests" },
   "deptry",
   "import-linter",
   "poethepoet",
@@ -61,19 +64,6 @@ environment.root = [ "./nullforge" ]
 [tool.pytest]
 ini_options.testpaths = [ "tests" ]
 ini_options.addopts = "-ra -q --tb=short --cov=nullforge --strict-markers"
-
-[tool.poe]
-tasks.format = "uv run ruff format ."
-tasks.check-format = "uv run ruff format --check ."
-tasks.lint = "uv run ruff check ."
-tasks.typecheck = "uv run --group dev --group tests ty check"
-tasks.lint-imports = "uv run --group dev lint-imports"
-tasks.deptry = "uv run --group dev deptry ."
-tasks.lint-md = "uv run --group dev prek run markdownlint-cli2 --all-files"
-tasks.check = [ "check-format", "lint", "lint-md", "typecheck", "lint-imports", "deptry" ]
-tasks.docs = "uv run --group docs zensical build --clean --strict"
-tasks."docs:dev" = "uv run --group docs zensical serve"
-tasks.tests = "uv run --group tests pytest"
 
 [tool.importlinter]
 root_package = "nullforge"
@@ -134,3 +124,18 @@ type = "independence"
 modules = [
   "nullforge.runes.*",
 ]
+
+[tool.poe]
+executor.type = "uv"
+tasks.format = "ruff format --check ."
+tasks."format:fix" = "ruff format ."
+tasks.lint = "ruff check ."
+tasks."lint:fix" = "ruff check --fix ."
+tasks."lint:md" = "prek run markdownlint-cli2 --all-files"
+tasks.typecheck = "ty check"
+tasks.lint-imports = "lint-imports --no-logo"
+tasks.deptry = "deptry ."
+tasks.check = [ "format", "lint", "typecheck", "lint-imports", "deptry" ]
+tasks.docs = { cmd = "zensical build --clean --strict", executor = { group = "docs" } }
+tasks."docs:dev" = { cmd = "zensical serve", executor = { group = "docs" } }
+tasks.tests = "pytest"

@@ -25,27 +25,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
-      - run: uv sync --all-groups
-
-      - name: Check formatting
-        run: uv run ruff format --check .
-
-      - name: Lint code
-        run: uv run ruff check .
-
-      - name: Type check
-        run: uv run ty check
-
-      - name: Check import contracts
-        run: uv run lint-imports
-
-      - name: Check dependency hygiene
-        run: uv run deptry .
+      - name: Run quality checks
+        run: uv run poe check
 
   hooks:
     name: 🪝 prek hooks
@@ -56,7 +42,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
