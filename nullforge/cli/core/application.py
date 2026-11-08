@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import ClassVar, Generic
 
 import rich_click as click
@@ -15,7 +16,7 @@ from nullforge.cli.core.types import ApplicationType
 class BaseApplication(Generic[ApplicationType]):  # noqa: UP046
     """Application singleton — central registry and dependency injector."""
 
-    default_components: ClassVar[list[type[BaseComponent]]] = []
+    default_components: ClassVar[Sequence[type[BaseComponent]]] = ()
     _instance: ClassVar[BaseApplication | None] = None
 
     def __init__(self) -> None:
