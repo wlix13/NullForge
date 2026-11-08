@@ -12,8 +12,8 @@ class MonitoringBackendType(StrEnum):
 class _MonitoringLayoutBase(BaseModel):
     """Static on-disk/service layout for monitoring agent backend."""
 
-    type: MonitoringBackendType = Field(description="The monitoring backend type")
-    base_dir: str | None = Field(..., description="The base/installation directory")
-    binary_path: str | None = Field(..., description="The path to the binary")
-    config_path: str | None = Field(..., description="The path to the configuration file")
-    systemd_service_name: str | None = Field(..., description="The systemd service name")
+    type: MonitoringBackendType = Field(frozen=True, description="The monitoring backend type")
+    base_dir: str | None = Field(..., frozen=True, description="The base/installation directory")
+    binary_path: str | None = Field(..., frozen=True, description="The path to the binary")
+    config_path: str | None = Field(..., frozen=True, description="The path to the configuration file")
+    systemd_service_name: str | None = Field(..., frozen=True, description="The systemd service name")

@@ -28,7 +28,7 @@ class DnsProvider(StrEnum):
 class _DnsServerBase(BaseModel):
     """Base for a DNS server."""
 
-    protocol: DnsProtocol
+    protocol: DnsProtocol = Field(frozen=True)
 
 
 class DnsServerDoU(_DnsServerBase):

@@ -14,11 +14,11 @@ class WarpEngineType(StrEnum):
 class _WarpEngineBase(BaseModel):
     """Base for a WARP engine."""
 
-    type: WarpEngineType = Field(description="The type of WARP engine")
-    binary_path: str = Field(description="The path to the WARP binary")
-    config_dir: str = Field(description="The path to the WARP configuration directory")
-    systemd_service_name: str = Field(description="The name of the systemd service")
-    policy_script: str = Field(default="", description="The path to the WARP policy script")
+    type: WarpEngineType = Field(frozen=True, description="The type of WARP engine")
+    binary_path: str = Field(frozen=True, description="The path to the WARP binary")
+    config_dir: str = Field(frozen=True, description="The path to the WARP configuration directory")
+    systemd_service_name: str = Field(frozen=True, description="The name of the systemd service")
+    policy_script: str = Field(default="", frozen=True, description="The path to the WARP policy script")
 
     @property
     def config_path(self) -> str:
