@@ -21,8 +21,8 @@ class ContainersRuntimeType(StrEnum):
 class _ContainersBackendBase(BaseModel):
     """Base for a containers backend."""
 
-    type: ContainersBackendType = Field(description="The type of containers backend")
-    runtime: ContainersRuntimeType = Field(description="The type of containers runtime")
+    type: ContainersBackendType = Field(frozen=True, description="The type of containers backend")
+    runtime: ContainersRuntimeType = Field(frozen=True, description="The type of containers runtime")
 
 
 class DockerContainersBackend(_ContainersBackendBase):
