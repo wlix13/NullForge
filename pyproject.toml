@@ -19,7 +19,7 @@ dynamic = [ "version" ]
 dependencies = [
   "click",
   "pydantic",
-  "pyinfra",
+  "pyinfra>=3.10,<4",
   "rich",
   "rich-click",
 ]

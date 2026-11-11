@@ -137,11 +137,11 @@ def _configure_ufw_firewall(opts: NetSecMold) -> None:
     )
 
     ipv6_value = "yes" if ipv6 else "no"
-    server.shell(
+    files.line(
         name=f"Configure UFW IPv6={ipv6_value}",
-        commands=[
-            f"sed -i 's/^IPV6=.*/IPV6={ipv6_value}/' /etc/default/ufw",
-        ],
+        path="/etc/default/ufw",
+        line=r"^IPV6=.*",
+        replace=f"IPV6={ipv6_value}",
         _sudo=True,
     )
 
@@ -172,11 +172,11 @@ def _configure_ufw_firewall(opts: NetSecMold) -> None:
         _sudo=True,
     )
 
-    server.shell(
+    files.put(
         name="Persist UFW ruleset checksum",
-        commands=[
-            f"printf '%s' '{checksum}' > {checksum_file}",
-        ],
+        src=io.StringIO(checksum),
+        dest=checksum_file,
+        mode="0644",
         _sudo=True,
     )
 
@@ -314,9 +314,11 @@ def _configure_firewalld_firewall(opts: NetSecMold) -> None:
         _sudo=True,
     )
 
-    server.shell(
+    files.put(
         name="Persist firewalld ruleset checksum",
-        commands=[f"printf '%s' '{checksum}' > {checksum_file}"],
+        src=io.StringIO(checksum),
+        dest=checksum_file,
+        mode="0644",
         _sudo=True,
     )
 
