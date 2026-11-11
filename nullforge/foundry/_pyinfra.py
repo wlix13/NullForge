@@ -72,12 +72,13 @@ def _patch_loading_message() -> None:
     if "loading_message" in _patched:
         return
 
+    from pyinfra.api.output import format_text
     from pyinfra_cli import cli as cli_module
 
     def _prepare_deploy_operations(state, config, operations):
         for i, filename in enumerate(operations):
             config.lock_current_state()
-            cli_module.logger.info(f"Loading: {cli_module.click.style(_stem(str(filename)), bold=True)}")
+            cli_module.logger.info(f"Loading: {format_text(_stem(str(filename)), bold=True)}")
             state.current_op_file_number = i
             cli_module.load_deploy_file(state, filename)
             config.reset_locked_state()
