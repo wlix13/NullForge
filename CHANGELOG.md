@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/wlix13/NullForge/compare/v0.3.1...v0.3.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* **foundry:** support pyinfra 3.11 ([4d4b17b](https://github.com/wlix13/NullForge/commit/4d4b17bfb4fe1a5b41333fd6e53b117c0dad170b))
+
 ## [0.3.1](https://github.com/wlix13/NullForge/compare/v0.3.0...v0.3.1) (2026-09-18)
 
 
