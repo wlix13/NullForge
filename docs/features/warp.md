@@ -16,7 +16,7 @@ WARP gives the host a Cloudflare-terminated tunnel interface without changing th
 
 ### masque
 
-- Installs the pinned `usque` binary and enrolls/registers the device on first run.
+- Installs pinned `usque` binary; enrolls/registers on first run, refreshes enrollment on later runs.
 - Deploys an IPv6 policy script and a systemd unit that brings up the interface with the configured name and MTU; outbound IPv6 is used only when the host has connectivity beside the WARP interface itself.
 
 ### wireguard
