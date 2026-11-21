@@ -9,14 +9,17 @@ from nullforge.models.netsec import (
     WEAK_MAC_PATTERNS,
     SshHostKeyType,
 )
-from nullforge.molds.netsec import FirewallRule, SshMold
+from nullforge.molds import FeaturesMold, FirewallRule, NetSecMold, SshMold, WarpMold
 from nullforge.runes import netsec as netsec_rune
 from nullforge.runes.netsec import (
     _build_firewalld_commands,
     _build_sshd_dropin,
     _build_ufw_command,
+    _ipv6_path,
     _resolve_conntrack_sysctls,
+    _rules_checksum,
     _supported_kex_algorithms,
+    _ufw_ipv6_rules,
 )
 from nullforge.smithy.network import conntrack_max_for
 
@@ -202,3 +205,104 @@ class TestSupportedKexAlgorithms:
     def test_empty_output_yields_empty_set(self) -> None:
         with patch.object(netsec_rune.host, "get_fact", return_value=""):
             assert _supported_kex_algorithms() == frozenset()
+
+
+class TestIpv6Path:
+    def _features(self, warp_install: bool, warp_iface: str = "warp") -> FeaturesMold:
+        return FeaturesMold(warp=WarpMold(install=warp_install, iface=warp_iface))
+
+    def test_native_ipv6_true(self) -> None:
+        with patch("nullforge.runes.netsec.has_ipv6", return_value=True):
+            assert _ipv6_path(self._features(warp_install=False)) is True
+
+    def test_warp_installed_no_native_true(self) -> None:
+        with patch("nullforge.runes.netsec.has_ipv6", return_value=False):
+            assert _ipv6_path(self._features(warp_install=True)) is True
+
+    def test_neither_false(self) -> None:
+        with patch("nullforge.runes.netsec.has_ipv6", return_value=False):
+            assert _ipv6_path(self._features(warp_install=False)) is False
+
+
+class TestUfwIpv6Rules:
+    def _netsec_opts(self, firewall_rules: list[FirewallRule] | None = None) -> NetSecMold:
+        return NetSecMold(firewall_rules=firewall_rules or [])
+
+    def _features(self, warp_install: bool, warp_iface: str = "warp") -> FeaturesMold:
+        return FeaturesMold(warp=WarpMold(install=warp_install, iface=warp_iface))
+
+    def _ipv6_rule(self) -> FirewallRule:
+        return FirewallRule(from_ip="2001:db8::/32", action="allow", comment="IPv6 rule")
+
+    def _ipv4_rule(self) -> FirewallRule:
+        return FirewallRule(from_ip="10.0.0.0/8", action="allow", comment="IPv4 rule")
+
+    def test_warp_only_manage_true_rules_retained(self) -> None:
+        opts = self._netsec_opts([self._ipv6_rule(), self._ipv4_rule()])
+        feats = self._features(warp_install=True)
+        with patch("nullforge.runes.netsec.has_ipv6", return_value=False):
+            manage, rules = _ufw_ipv6_rules(opts, feats)
+        assert manage is True
+        assert len(rules) == 2
+        assert rules[0].comment == "IPv6 rule"
+        assert rules[1].comment == "IPv4 rule"
+
+    def test_native_ipv6_no_warp_manage_true_rules_unchanged(self) -> None:
+        opts = self._netsec_opts([self._ipv6_rule(), self._ipv4_rule()])
+        feats = self._features(warp_install=False)
+        with patch("nullforge.runes.netsec.has_ipv6", return_value=True):
+            manage, rules = _ufw_ipv6_rules(opts, feats)
+        assert manage is True
+        assert len(rules) == 2
+        assert rules[0].comment == "IPv6 rule"
+        assert rules[1].comment == "IPv4 rule"
+
+    def test_neither_manage_false_ipv6_rules_dropped(self) -> None:
+        opts = self._netsec_opts([self._ipv6_rule(), self._ipv4_rule()])
+        feats = self._features(warp_install=False)
+        with patch("nullforge.runes.netsec.has_ipv6", return_value=False):
+            manage, rules = _ufw_ipv6_rules(opts, feats)
+        assert manage is False
+        assert len(rules) == 1
+        assert rules[0].comment == "IPv4 rule"
+
+    def test_native_ipv6_plus_warp_manage_true_no_warp_rules(self) -> None:
+        opts = self._netsec_opts([self._ipv6_rule(), self._ipv4_rule()])
+        feats = self._features(warp_install=True)
+        with patch("nullforge.runes.netsec.has_ipv6", return_value=True):
+            manage, rules = _ufw_ipv6_rules(opts, feats)
+        assert manage is True
+        assert len(rules) == 2
+        assert rules[0].comment == "IPv6 rule"
+        assert rules[1].comment == "IPv4 rule"
+
+
+class TestRulesChecksum:
+    def _rule(self, **kwargs) -> FirewallRule:
+        return FirewallRule(**kwargs)
+
+    def test_stable_for_identical_inputs(self) -> None:
+        rules = [self._rule(port=22, action="allow"), self._rule(port=443, action="allow")]
+        h1 = _rules_checksum(rules, True)
+        h2 = _rules_checksum(rules, True)
+        assert h1 == h2
+
+    def test_differs_when_ipv6_flag_differs(self) -> None:
+        rules = [self._rule(port=22, action="allow")]
+        h1 = _rules_checksum(rules, True)
+        h2 = _rules_checksum(rules, False)
+        assert h1 != h2
+
+    def test_differs_when_rules_differ(self) -> None:
+        rules1 = [self._rule(port=22, action="allow")]
+        rules2 = [self._rule(port=443, action="allow")]
+        h1 = _rules_checksum(rules1, True)
+        h2 = _rules_checksum(rules2, True)
+        assert h1 != h2
+
+    def test_order_independent(self) -> None:
+        rules1 = [self._rule(port=22, action="allow"), self._rule(port=443, action="allow")]
+        rules2 = [self._rule(port=443, action="allow"), self._rule(port=22, action="allow")]
+        h1 = _rules_checksum(rules1, True)
+        h2 = _rules_checksum(rules2, True)
+        assert h1 == h2

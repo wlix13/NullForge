@@ -28,7 +28,7 @@ On any rule change the ruleset is reset and reapplied from scratch - the invento
 
 Default policies: **incoming denied**, outgoing allowed, plus one rule allowing SSH on port 22.
 
-Rules with IPv6 addresses are silently skipped on hosts without IPv6 connectivity.
+Rules with IPv6 addresses are managed when host has IPv6 path (native or WARP tunnel), dropped otherwise.
 
 ### Rule fields (`features.netsec.firewall_rules[]`)
 
@@ -60,7 +60,7 @@ Four opinionated groups, each persisted to its own file under `/etc/sysctl.d/`:
 | `system_sysctl` | file-handle limits, `vm.swappiness=10` |
 | `conntrack_sysctl` | shortened TCP/UDP conntrack timeouts; `nf_conntrack_max` sized from RAM at deploy time |
 | `ipv4_sysctl` | BBR + fq, large buffers and backlogs, TCP Fast Open, keepalive tuning |
-| `ipv6_sysctl` | neighbor-table sizing; applied only when the host has IPv6 |
+| `ipv6_sysctl` | neighbor-table sizing; applied only when host has IPv6 path (native or WARP tunnel) |
 
 Set a group to `None` to skip it, or pass your own dict to replace it wholesale.
 

@@ -25,6 +25,20 @@ from nullforge.smithy.packages import get_pm
 from nullforge.smithy.system import get_total_memory
 
 
+def _ipv6_path(features: FeaturesMold) -> bool:
+    """Host has IPv6 path (native or WARP tunnel)."""
+
+    return has_ipv6() or features.warp.install
+
+
+def _ufw_ipv6_rules(opts: NetSecMold, features: FeaturesMold) -> tuple[bool, list[FirewallRule]]:
+    """Compute IPv6 management flag and filtered rule list for UFW."""
+
+    manage = _ipv6_path(features)
+    rules = [r for r in opts.firewall_rules if manage or not r.is_ipv6]
+    return manage, rules
+
+
 SSHD_CONFIG_PATH = "/etc/ssh/sshd_config"
 SSH_MODULI_PATH = "/etc/ssh/moduli"
 
@@ -51,24 +65,23 @@ def deploy_network_security() -> None:
     if netsec_opts.firewall:
         pm = get_pm()
         if pm.is_rhel_based:
-            _configure_firewalld_firewall(netsec_opts)
+            _configure_firewalld_firewall(netsec_opts, features)
         else:
-            _configure_ufw_firewall(netsec_opts)
+            _configure_ufw_firewall(netsec_opts, features)
 
-    _apply_sysctl_tuning(netsec_opts)
+    _apply_sysctl_tuning(netsec_opts, features)
 
 
-def _rules_checksum(rules: list[FirewallRule]) -> str:
+def _rules_checksum(rules: list[FirewallRule], manage_ipv6: bool) -> str:
     """Compute a deterministic SHA-256 of the desired active ruleset.
 
     Rules are serialised as sorted JSON objects and then sorted themselves so
     order in inventory does not affect fingerprint. Any change to ruleset:
-    add rule, remove rule, modify field will produces different hash,
-    triggering a full UFW reset on next run.
+    add rule, remove rule, modify field or IPv6 flag produces different hash.
     """
 
     fingerprints = sorted(json.dumps(r.model_dump(), sort_keys=True) for r in rules)
-    payload = "\n".join(fingerprints)
+    payload = "\n".join(fingerprints) + f"\nipv6={manage_ipv6}"
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -103,16 +116,14 @@ def _build_ufw_command(rule: FirewallRule) -> str:
     return " ".join(parts)
 
 
-def _configure_ufw_firewall(opts: NetSecMold) -> None:
+def _configure_ufw_firewall(opts: NetSecMold, features: FeaturesMold) -> None:
     """Configure UFW firewall with the specified rule set.
 
-    IPv6-targeted rules (those whose source/destination is an IPv6 address or
-    subnet) are silently dropped when the host has no IPv6 connectivity.
+    IPv6-targeted rules managed when host has IPv6 path (native or WARP tunnel).
     """
 
-    ipv6 = has_ipv6()
-    active_rules = [r for r in opts.firewall_rules if ipv6 or not r.is_ipv6]
-    checksum = _rules_checksum(active_rules)
+    manage_ipv6, active_rules = _ufw_ipv6_rules(opts, features)
+    checksum = _rules_checksum(active_rules, manage_ipv6)
     checksum_file = "/etc/ufw/.nullforge_checksum"
 
     pm = get_pm()
@@ -136,7 +147,7 @@ def _configure_ufw_firewall(opts: NetSecMold) -> None:
         _sudo=True,
     )
 
-    ipv6_value = "yes" if ipv6 else "no"
+    ipv6_value = "yes" if manage_ipv6 else "no"
     files.line(
         name=f"Configure UFW IPv6={ipv6_value}",
         path="/etc/default/ufw",
@@ -241,17 +252,17 @@ def _build_firewalld_commands(rule: FirewallRule) -> list[str]:
     return [f"firewall-cmd --permanent --zone={zone} --add-rich-rule='{make_rich_rule(family, proto)}'"]
 
 
-def _configure_firewalld_firewall(opts: NetSecMold) -> None:
+def _configure_firewalld_firewall(opts: NetSecMold, features: FeaturesMold) -> None:
     """Configure firewalld with the specified rule set.
 
-    IPv6-targeted rules are silently dropped when the host has no IPv6 connectivity.
+    IPv6-targeted rules managed when host has IPv6 path (native or WARP tunnel).
     direction='out' rules raise ValueError as egress control requires firewalld policy objects.
     action='limit' rules raise ValueError as firewalld has no equivalent of ufw's rate limiting.
     """
 
-    ipv6 = has_ipv6()
+    ipv6 = _ipv6_path(features)
     active_rules = [r for r in opts.firewall_rules if ipv6 or not r.is_ipv6]
-    checksum = _rules_checksum(active_rules)
+    checksum = _rules_checksum(active_rules, ipv6)
     checksum_file = "/etc/firewalld/.nullforge_checksum"
 
     pm = get_pm()
@@ -521,14 +532,14 @@ def _resolve_conntrack_sysctls(configured: dict[str, int] | None) -> dict[str, i
     return {**runtime_sizing, **configured}
 
 
-def _apply_sysctl_tuning(opts: NetSecMold) -> None:
+def _apply_sysctl_tuning(opts: NetSecMold, features: FeaturesMold) -> None:
     """Apply system kernel parameter tuning."""
 
     persist_map = [
         ("system", opts.system_sysctl, "/etc/sysctl.d/99-system.conf"),
         ("conntrack", _resolve_conntrack_sysctls(opts.conntrack_sysctl), "/etc/sysctl.d/99-conntrack.conf"),
         ("ipv4", opts.ipv4_sysctl, "/etc/sysctl.d/99-ipv4.conf"),
-        ("ipv6", opts.ipv6_sysctl if has_ipv6() else None, "/etc/sysctl.d/99-ipv6.conf"),
+        ("ipv6", opts.ipv6_sysctl if _ipv6_path(features) else None, "/etc/sysctl.d/99-ipv6.conf"),
     ]
 
     for desc, sysctls, persist_file in host.loop(persist_map):
