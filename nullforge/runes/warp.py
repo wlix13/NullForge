@@ -188,6 +188,12 @@ def _deploy_masque_warp(opts: WarpMold) -> None:
         config_condition = register_op.did_succeed
     else:
         config_condition = lambda: True  # noqa: E731  # config already exists, ops run unconditionally
+        server.shell(
+            name="Refresh Warp device enrollment",
+            commands=f"{usque_bin} enroll -c {usque_config_path}",
+            _sudo=True,
+            _ignore_errors=True,
+        )
 
     files.file(
         name="Ensure WARP config file ownership to cloudflare",
