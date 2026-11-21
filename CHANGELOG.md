@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/wlix13/NullForge/compare/v0.3.2...v0.3.3) (2026-11-21)
+
+
+### Bug Fixes
+
+* **netsec:** manage IPv6 firewall when WARP is the only IPv6 path ([6123b29](https://github.com/wlix13/NullForge/commit/6123b29f5575a26a4ec8b0d47854167c959f7540))
+* **warp:** refresh existing usque enrollment ([070a12f](https://github.com/wlix13/NullForge/commit/070a12f91c5b4f2d928c3601c6dab943a4ea4d6b))
+
 ## [0.3.2](https://github.com/wlix13/NullForge/compare/v0.3.1...v0.3.2) (2026-11-12)
 
 
