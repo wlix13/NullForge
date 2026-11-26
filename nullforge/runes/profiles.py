@@ -7,7 +7,7 @@ from pyinfra.facts.files import Block, Directory, File
 from pyinfra.operations import files, git, server
 
 from nullforge.models.profiles import NerdFont
-from nullforge.molds import FeaturesMold, ProfilesMold, UserMold
+from nullforge.molds import FeaturesMold, ProfilesMold
 from nullforge.smithy.github import sha256_for_download_url
 from nullforge.smithy.http import curl_args
 from nullforge.smithy.install import install_release_binary
@@ -40,21 +40,22 @@ def deploy_shell_profiles() -> None:
     _install_starship(reinstall)
 
     for user, home_dir in host.loop(_get_profile_targets(features)):
+        if not host.get_fact(Directory, home_dir, _sudo=True):
+            host.noop(f"skip profiles for {user}: home directory {home_dir} not found")
+            continue
         _install_user_profiles(user, home_dir, reinstall, profiles_opts.font)
 
 
 def _get_profile_targets(features: FeaturesMold) -> list[tuple[str, str]]:
     """Get list of users and home directories for profile installation."""
 
-    user_opts: UserMold = features.users
     profiles_opts: ProfilesMold = features.profiles
     targets = []
     if profiles_opts.for_root:
         targets.append(("root", "/root"))
 
-    if profiles_opts.for_user:
-        user = user_opts.name
-        targets.append((user, f"/home/{user}"))
+    for name in profiles_opts.users:
+        targets.append((name, f"/home/{name}"))
 
     return targets
 

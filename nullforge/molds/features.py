@@ -2,7 +2,7 @@
 
 from collections.abc import Iterator
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .base_mold import BaseMold
 from .containers import ContainersMold
@@ -34,6 +34,14 @@ class FeaturesMold(BaseMold):
     xray: XrayCoreMold = Field(default_factory=XrayCoreMold)
     tor: TorMold = Field(default_factory=TorMold)
     telemt: TelemtMold = Field(default_factory=TelemtMold)
+
+    @model_validator(mode="after")
+    def _validate_profiles_users_subset(self):
+        user_names = {u.name for u in self.users.users}
+        for name in self.profiles.users:
+            if name not in user_names:
+                raise ValueError(f"profiles.users contains unknown user: {name!r}")
+        return self
 
 
 FEATURE_MOLD_MAPPING: dict[str, type[BaseMold]] = {}
