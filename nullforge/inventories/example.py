@@ -1,19 +1,38 @@
 from nullforge.models.dns import DnsMode
-from nullforge.models.users import Shell
-from nullforge.molds import DnsMold, MonitoringMold, TelemtMold, UserMold, WarpMold
+from nullforge.models.users import Shell, UserRole
+from nullforge.molds import DnsMold, MonitoringMold, ProfilesMold, TelemtMold, UserMold, UsersMold, WarpMold
 from nullforge.molds.defaults import BASE_FEATURES, BASE_SYSTEM
 from nullforge.molds.monitoring import NezhaBackend
 from nullforge.molds.utils import merge_features, merge_system
 
 
-users = UserMold(
-    manage=True,
-    name="example",
-    shell=Shell.ZSH,
+users = UsersMold(
+    users=[
+        UserMold(
+            name="example",
+            role=UserRole.ADMIN,
+            shell=Shell.ZSH,
+        ),
+        UserMold(
+            name="ci-deploy",
+            role=UserRole.DEPLOY,
+            sudo_commands=[
+                "/usr/bin/systemctl restart app.service",
+                "/usr/bin/systemctl status app.service",
+            ],
+            shell=Shell.BASH,
+            ssh_keys=["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleDeployKey ci-deploy@example"],
+        ),
+    ]
 )
 """User configuration preset
-with user management enabled and the user "example".
-with shell set to ZSH (default behavior).
+with user management enabled and two users:
+"example" (admin) and "ci-deploy" (deploy with limited sudo).
+"""
+
+profiles = ProfilesMold(users=["example"])
+"""Profiles configuration preset
+with shell profiles for the example user.
 """
 
 warp = WarpMold(
@@ -62,6 +81,7 @@ and the MEKO SYN rate-limiting fix is applied.
 
 _overrides = (
     users,
+    profiles,
     warp,
     dns,
     monitoring,

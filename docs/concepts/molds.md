@@ -28,8 +28,8 @@ Every feature sub-mold implements `is_active`.
 Most simply return `self.install`; the exceptions encode their own semantics:
 
 - `DnsMold` - active while `mode != "none"`.
-- `UserMold` - active while `manage` is true.
-- `ProfilesMold` - active while `for_root` or `for_user` is true.
+- `UsersMold` - active while the users list is non-empty.
+- `ProfilesMold` - active while `for_root` is true or `users` list is non-empty.
 
 A sub-mold may also rename its rune or opt out of automatic dispatch - see [dispatch](runes.md#dispatch).
 

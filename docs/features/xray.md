@@ -9,7 +9,7 @@ Installs [Xray-core](https://github.com/XTLS/Xray-core) with fresh geo data, rea
 - Xray-core via the official [Xray-install](https://github.com/XTLS/Xray-install) script (`--beta` channel), skipped when `/usr/local/bin/xray` exists.
 - `geoip.dat` / `geosite.dat` from [Loyalsoldier/v2ray-rules-dat](https://github.com/Loyalsoldier/v2ray-rules-dat) into `/usr/local/share/xray` - downloaded only when missing; delete the files to pull fresh data on the next cast.
 - Ensures the `xray` service is running and enabled.
-- When [`users.manage`](users.md) is on, grants the managed user ACL access to `/usr/local/share/xray` and `/usr/local/etc/xray` (including `config.json`), so proxy config can be managed without root.
+- When [`users` rune](users.md) is active, grants all users from `features.users` ACL access to `/usr/local/share/xray` and `/usr/local/etc/xray` (including `config.json`), so proxy config can be managed without root.
 
 !!! note "Bring your own config"
 
