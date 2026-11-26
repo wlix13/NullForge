@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.4](https://github.com/wlix13/NullForge/compare/v0.3.3...v0.3.4) (2026-11-26)
+
+
+### Features
+
+* **profiles:** make shell profiles per-user ([6b80c99](https://github.com/wlix13/NullForge/commit/6b80c996975dcbc7ba840348c3191455b1f15285))
+* **users:** model users as role-carrying list ([8df3d70](https://github.com/wlix13/NullForge/commit/8df3d7007751f2e4cf8ac1b4ce18ac60a5d7e2ac))
+
+
+### Documentation
+
+* **users:** document role-carrying users list ([1429842](https://github.com/wlix13/NullForge/commit/1429842cb85fe27c5c6fe7d9ba561540bfac5b91))
+
 ## [0.3.3](https://github.com/wlix13/NullForge/compare/v0.3.2...v0.3.3) (2026-11-21)
 
 
