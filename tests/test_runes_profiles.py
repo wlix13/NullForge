@@ -1,7 +1,11 @@
 from unittest.mock import MagicMock, patch
 
+from pyinfra.facts.files import Directory
+
 from nullforge.models.profiles import NerdFont
-from nullforge.runes.profiles import ZSHRC_MARKER, _configure_user_zshrc, _install_nerd_font
+from nullforge.models.users import UserRole
+from nullforge.molds import FeaturesMold, ProfilesMold, UserMold, UsersMold
+from nullforge.runes.profiles import ZSHRC_MARKER, _configure_user_zshrc, _get_profile_targets, _install_nerd_font
 from nullforge.smithy.versions import DEFAULT_VERSIONS, Versions
 
 
@@ -112,3 +116,144 @@ class TestInstallNerdFont:
         assert any(f"/home/core/.local/share/fonts/FiraCode-{version}" in cmd for cmd in commands)
         # older versions of the same family are cleared so the two never mix
         assert commands[0] == "rm -rf /home/core/.local/share/fonts/FiraCode-*"
+
+
+class TestGetProfileTargets:
+    def test_root_only(self) -> None:
+        features = FeaturesMold(
+            users=UsersMold(
+                users=[
+                    UserMold(name="core", role=UserRole.ADMIN),
+                    UserMold(
+                        name="ci",
+                        role=UserRole.DEPLOY,
+                        sudo_commands=["/usr/bin/systemctl restart app"],
+                    ),
+                    UserMold(name="viewer", role=UserRole.NONE),
+                ]
+            ),
+            profiles=ProfilesMold(for_root=True),
+        )
+        assert _get_profile_targets(features) == [
+            ("root", "/root"),
+        ]
+
+    def test_users_list_only(self) -> None:
+        features = FeaturesMold(
+            users=UsersMold(
+                users=[
+                    UserMold(name="core", role=UserRole.ADMIN),
+                    UserMold(
+                        name="ci",
+                        role=UserRole.DEPLOY,
+                        sudo_commands=["/usr/bin/systemctl restart app"],
+                    ),
+                    UserMold(name="viewer", role=UserRole.NONE),
+                ]
+            ),
+            profiles=ProfilesMold(for_root=False, users=["viewer", "ci"]),
+        )
+        assert _get_profile_targets(features) == [
+            ("viewer", "/home/viewer"),
+            ("ci", "/home/ci"),
+        ]
+
+    def test_root_and_users_list(self) -> None:
+        features = FeaturesMold(
+            users=UsersMold(
+                users=[
+                    UserMold(name="core", role=UserRole.ADMIN),
+                    UserMold(name="ops2", role=UserRole.ADMIN),
+                    UserMold(name="viewer", role=UserRole.NONE),
+                ]
+            ),
+            profiles=ProfilesMold(for_root=True, users=["core", "viewer"]),
+        )
+        assert _get_profile_targets(features) == [
+            ("root", "/root"),
+            ("core", "/home/core"),
+            ("viewer", "/home/viewer"),
+        ]
+
+    def test_no_targets(self) -> None:
+        features = FeaturesMold(
+            users=UsersMold(
+                users=[
+                    UserMold(name="core", role=UserRole.ADMIN),
+                    UserMold(name="viewer", role=UserRole.NONE),
+                ]
+            ),
+            profiles=ProfilesMold(for_root=False),
+        )
+        assert _get_profile_targets(features) == []
+
+    def test_empty_users_list_no_targets(self) -> None:
+        features = FeaturesMold(
+            users=UsersMold(
+                users=[
+                    UserMold(name="core", role=UserRole.ADMIN),
+                ]
+            ),
+            profiles=ProfilesMold(for_root=False, users=[]),
+        )
+        assert _get_profile_targets(features) == []
+
+
+class TestDeployShellProfilesMissingHome:
+    def test_skips_user_with_missing_home(self) -> None:
+        # user whose home Directory fact is absent -> noop, no profile ops
+        from unittest.mock import MagicMock, patch
+
+        features = FeaturesMold(
+            users=UsersMold(
+                users=[
+                    UserMold(name="core", role=UserRole.ADMIN),
+                    UserMold(name="nohome", role=UserRole.NONE),
+                ]
+            ),
+            profiles=ProfilesMold(for_root=False, users=["core", "nohome"]),
+        )
+
+        fake_host = MagicMock()
+        fake_host.data = MagicMock()
+        fake_host.data.features = features
+
+        def get_fact_side_effect(*args, **kwargs):
+            # args[0] is fact class, args[1] is path
+            if len(args) >= 2 and args[0] is Directory and args[1] in ("/home/core", "/home/nohome"):
+                return args[1] == "/home/core"  # core exists, nohome missing
+            return True  # default for other fact checks (plugins, etc.)
+
+        fake_host.get_fact.side_effect = get_fact_side_effect
+        fake_host.loop.side_effect = lambda items: iter(items)
+
+        fake_files = MagicMock()
+        fake_server = MagicMock()
+        fake_git = MagicMock()
+
+        with (
+            patch("nullforge.runes.profiles.host", fake_host),
+            patch("nullforge.runes.profiles.files", fake_files),
+            patch("nullforge.runes.profiles.server", fake_server),
+            patch("nullforge.runes.profiles.git", fake_git),
+            patch("nullforge.runes.profiles._install_eza"),
+            patch("nullforge.runes.profiles._install_tmux"),
+            patch("nullforge.runes.profiles._install_nvim"),
+            patch("nullforge.runes.profiles._install_zoxide"),
+            patch("nullforge.runes.profiles._install_direnv"),
+            patch("nullforge.runes.profiles._install_starship"),
+        ):
+            from nullforge.runes.profiles import deploy_shell_profiles
+
+            deploy_shell_profiles()
+
+        # verify noop called for missing home user
+        noop_calls = [call for call in fake_host.method_calls if call[0] == "noop"]
+        assert any("skip profiles for nohome" in str(call) for call in noop_calls)
+
+        # verify profile ops not called for nohome
+        # check that no operations used _sudo_user="nohome"
+        for mock in (fake_files, fake_server, fake_git):
+            for call in mock.method_calls:
+                kwargs = call.kwargs if len(call) > 2 else {}
+                assert kwargs.get("_sudo_user") != "nohome", f"Unexpected op for nohome: {call}"
