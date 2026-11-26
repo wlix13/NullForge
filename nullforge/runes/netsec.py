@@ -19,7 +19,7 @@ from nullforge.models.netsec import (
     WEAK_KEX_PATTERNS,
     WEAK_MAC_PATTERNS,
 )
-from nullforge.molds import FeaturesMold, FirewallRule, NetSecMold, SshMold, UserMold
+from nullforge.molds import FeaturesMold, FirewallRule, NetSecMold, SshMold, UsersMold
 from nullforge.smithy.network import conntrack_max_for, has_ipv6, module_loaded
 from nullforge.smithy.packages import get_pm
 from nullforge.smithy.system import get_total_memory
@@ -57,10 +57,9 @@ def deploy_network_security() -> None:
     """Deploy network security and hardening configuration."""
 
     features: FeaturesMold = host.data.features
-    user_opts: UserMold = features.users
     netsec_opts: NetSecMold = features.netsec
 
-    _enhance_ssh_daemon(user_opts, netsec_opts.ssh)
+    _enhance_ssh_daemon(features.users, netsec_opts.ssh)
 
     if netsec_opts.firewall:
         pm = get_pm()
@@ -458,13 +457,13 @@ def _filter_dh_moduli() -> OperationMeta | None:
     )
 
 
-def _enhance_ssh_daemon(user_opts: UserMold, ssh_opts: SshMold) -> None:
+def _enhance_ssh_daemon(users_opts: UsersMold, ssh_opts: SshMold) -> None:
     """Enhance SSH daemon configuration."""
 
     pm = get_pm()
 
     sshd_directives = [
-        ("Modify SSH password authentication", "PasswordAuthentication", "no", user_opts.manage),
+        ("Modify SSH password authentication", "PasswordAuthentication", "no", users_opts.is_active),
         ("Disable SSH root login", "PermitRootLogin", "no", True),
         ("Enable DNS resolution for SSH", "UseDNS", "yes", True),
     ]

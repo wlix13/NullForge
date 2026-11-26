@@ -39,8 +39,8 @@ def deploy_xray() -> None:
         _sudo=True,
     )
 
-    if features.users.manage:
-        _setup_acls(features.users.name)
+    for user in host.loop(features.users):
+        _setup_acls(user.name)
 
 
 def _install_xray(opts: XrayCoreMold) -> None:

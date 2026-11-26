@@ -13,7 +13,7 @@ from .netsec import NetSecMold
 from .profiles import ProfilesMold
 from .telemt import TelemtMold
 from .tor import TorMold
-from .user import UserMold
+from .user import UserMold, UserRole, UsersMold
 from .warp import WarpMold
 from .xray import XrayCoreMold
 from .zerotrust import ZeroTrustTunnelMold
@@ -24,7 +24,7 @@ class FeaturesMold(BaseMold):
 
     warp: WarpMold = Field(default_factory=WarpMold)
     dns: DnsMold = Field(default_factory=DnsMold)
-    users: UserMold = Field(default_factory=UserMold)
+    users: UsersMold = Field(default_factory=lambda: UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]))
     netsec: NetSecMold = Field(default_factory=NetSecMold)
     profiles: ProfilesMold = Field(default_factory=ProfilesMold)
     zerotrust: ZeroTrustTunnelMold = Field(default_factory=ZeroTrustTunnelMold)

@@ -11,7 +11,7 @@ from .profiles import ProfilesMold
 from .system import SystemMold
 from .telemt import TelemtMold
 from .tor import TorMold
-from .user import UserMold
+from .user import UserMold, UsersMold
 from .warp import WarpMold
 from .xray import XrayCoreMold
 from .zerotrust import ZeroTrustTunnelMold
@@ -32,6 +32,7 @@ __all__ = [
     "TelemtMold",
     "TorMold",
     "UserMold",
+    "UsersMold",
     "WarpMold",
     "XrayCoreMold",
     "ZeroTrustTunnelMold",

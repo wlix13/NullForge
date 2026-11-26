@@ -50,7 +50,8 @@ class BaseMold(BaseModel):
     def _redact_value(cls, value: Any, dumped: Any) -> Any:
         """Mirror dumped value against live counterpart, redacting nested molds."""
 
-        if isinstance(value, BaseMold) and isinstance(dumped, dict):
+        # BaseMold or other BaseModel with dict dump: recurse into _redact
+        if isinstance(value, BaseModel) and isinstance(dumped, dict):
             return cls._redact(value, dumped)
         if isinstance(value, (list, tuple)) and isinstance(dumped, list):
             return [cls._redact_value(v, d) for v, d in zip(value, dumped)]

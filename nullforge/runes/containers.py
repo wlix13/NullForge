@@ -8,7 +8,8 @@ from pyinfra.facts.server import Arch, Users, Which
 from pyinfra.operations import apt, files, server, systemd
 
 from nullforge.models.containers import ContainersBackendType
-from nullforge.molds import ContainersMold, FeaturesMold, UserMold
+from nullforge.models.users import UserRole
+from nullforge.molds import ContainersMold, FeaturesMold
 from nullforge.smithy.arch import deb_arch
 from nullforge.smithy.http import curl_args
 from nullforge.smithy.packages import get_pm
@@ -27,20 +28,20 @@ def deploy_containers() -> None:
 
     features: FeaturesMold = host.data.features
     containers_opts: ContainersMold = features.containers
-    user_opts: UserMold = features.users
+
+    admin_users = [u.name for u in features.users if u.role is UserRole.ADMIN]
 
     match containers_opts.backend_type:
         case ContainersBackendType.DOCKER:
             _install_docker()
-            if user_opts.manage:
-                _add_user_to_docker_group(user_opts.name)
+            for username in host.loop(admin_users):
+                _add_user_to_docker_group(username)
             _install_gvisor()
         case ContainersBackendType.PODMAN:
             _install_crun()
             _install_podman()
-            if user_opts.manage:
-                _ensure_subid_ranges(user_opts.name)
-            _enable_podman_autoupdate(user_opts)
+            _ensure_subid_ranges(admin_users)
+            _enable_podman_autoupdate(admin_users)
         case ContainersBackendType.CRIO:
             raise ValueError("CRIO is not supported yet")
 
@@ -216,28 +217,35 @@ def _install_podman() -> None:
     )
 
 
-def _ensure_subid_ranges(user: str) -> None:
-    """Allocate subuid/subgid ranges for user when absent."""
+def _ensure_subid_ranges(users: list[str]) -> None:
+    """Allocate subuid/subgid ranges for users when absent."""
 
-    user_exists = user in host.get_fact(Users)
+    existing_users = host.get_fact(Users)
+    allocations: list[tuple[str, str, int]] = []
 
-    for path in host.loop(("/etc/subuid", "/etc/subgid")):
-        entries = host.get_fact(FileContents, path)
+    for path in ("/etc/subuid", "/etc/subgid"):
+        raw_entries = host.get_fact(FileContents, path)
+        entries = list(raw_entries or [])
+        next_start = _next_subid_start(entries)
 
-        if entries is not None and not user_exists:
-            host.noop(f"useradd allocates {path} range when creating {user}")
-            continue
+        for user in users:
+            if raw_entries is not None and user not in existing_users:
+                host.noop(f"useradd allocates {path} range when creating {user}")
+                continue
 
-        entries = entries or []
-        if any(entry.startswith(f"{user}:") for entry in entries):
-            host.noop(f"{user} already has {path} range")
-            continue
+            if any(entry.startswith(f"{user}:") for entry in entries):
+                host.noop(f"{user} already has {path} range")
+                continue
 
+            allocations.append((path, user, next_start))
+            next_start += SUBID_COUNT
+
+    for path, user, start in host.loop(allocations):
         files.line(
             name=f"Allocate {path} range for {user}",
             path=path,
             line=f"^{re.escape(user)}:",
-            replace=f"{user}:{_next_subid_start(entries)}:{SUBID_COUNT}",
+            replace=f"{user}:{start}:{SUBID_COUNT}",
             _sudo=True,
         )
 
@@ -247,7 +255,7 @@ def _next_subid_start(entries: list[str]) -> int:
     return max([SUBID_MIN, *ends])
 
 
-def _enable_podman_autoupdate(user_opts: UserMold) -> None:
+def _enable_podman_autoupdate(admin_users: list[str]) -> None:
     """Enable podman auto-update timer, rootful and rootless."""
 
     systemd.service(
@@ -258,19 +266,16 @@ def _enable_podman_autoupdate(user_opts: UserMold) -> None:
         _sudo=True,
     )
 
-    if not user_opts.manage:
-        return
-
-    user = user_opts.name
-    server.shell(
-        name=f"Enable rootless podman auto-update timer for {user}",
-        commands=[
-            f"loginctl enable-linger {user}",
-            f"runuser -u {user} -- env XDG_RUNTIME_DIR=/run/user/$(id -u {user})"
-            " systemctl --user enable --now podman-auto-update.timer",
-        ],
-        _sudo=True,
-    )
+    for user in host.loop(admin_users):
+        server.shell(
+            name=f"Enable rootless podman auto-update timer for {user}",
+            commands=[
+                f"loginctl enable-linger {user}",
+                f"runuser -u {user} -- env XDG_RUNTIME_DIR=/run/user/$(id -u {user})"
+                " systemctl --user enable --now podman-auto-update.timer",
+            ],
+            _sudo=True,
+        )
 
 
 def _install_crun() -> None:
