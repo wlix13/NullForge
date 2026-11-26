@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import ClassVar, Generic
+from typing import ClassVar, Generic, cast
 
 import rich_click as click
 from rich.console import Console
@@ -34,7 +34,7 @@ class BaseApplication(Generic[ApplicationType]):  # noqa: UP046
 
         if cls._instance is None:
             raise RuntimeError("Application not initialized")
-        return cls._instance  # ty:ignore[invalid-return-type]
+        return cast(ApplicationType, cls._instance)
 
     @classmethod
     def reset(cls) -> None:

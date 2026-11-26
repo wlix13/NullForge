@@ -2,7 +2,7 @@
 
 A complete terminal environment: modern CLI tools system-wide, plus per-user shell, editor and multiplexer setups.
 
-**Rune:** `profiles` - **Active when:** `for_root or for_user` - **Default:** on for root
+**Rune:** `profiles` - **Active when:** `for_root or users list non-empty` - **Default:** on for root
 
 ## System-wide tools
 
@@ -19,7 +19,7 @@ Installed once, for all users; pinned tools re-install when their [pin](../guide
 
 ## Per-user setup
 
-Applied to root (`for_root`), the [managed user](users.md) (`for_user`), or both:
+Applied to root (`for_root`) and/or users listed in `features.profiles.users` (each name must exist in [`features.users`](users.md)):
 
 - **oh-my-zsh** plus plugins: `zsh-autosuggestions`, `zsh-syntax-highlighting`, `ohmyzsh-full-autoupdate`.
 - **`.zshrc`** - the generated part lives in a marked block (`# ... NULLFORGE MANAGED BLOCK`) *prepended* to the file, so your own lines stay below and win.
@@ -39,9 +39,9 @@ Applied to root (`for_root`), the [managed user](users.md) (`for_user`), or both
 | Field | Default | Description |
 | --- | --- | --- |
 | `for_root` | `true` | Provision root's environment |
-| `for_user` | `false` | Provision the managed user's environment |
 | `reinstall` | `false` | Reinstall tools and re-clone plugin/editor repos even when present |
 | `font` | `None` | Nerd Font family (`JetBrainsMono`, `Hack`, `Meslo`, ... - 22 curated families); `None` skips fonts |
+| `users` | `[]` | List of user names to profile; each must exist in `features.users` |
 
 `reinstall` is the recovery lever: oh-my-zsh, plugins, TPM and NvChad are git clones that are otherwise left alone once present.
 
@@ -49,7 +49,13 @@ Applied to root (`for_root`), the [managed user](users.md) (`for_user`), or both
 
 ```python
 from nullforge.models.profiles import NerdFont
-from nullforge.molds import ProfilesMold
+from nullforge.models.users import UserRole
+from nullforge.molds import ProfilesMold, UserMold, UsersMold
 
-profiles = ProfilesMold(for_user=True, font=NerdFont.JETBRAINS_MONO)
+users = UsersMold(
+    users=[
+        UserMold(name="ops", role=UserRole.ADMIN),
+    ]
+)
+profiles = ProfilesMold(users=["ops"], font=NerdFont.JETBRAINS_MONO)
 ```

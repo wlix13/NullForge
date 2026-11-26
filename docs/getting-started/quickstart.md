@@ -9,16 +9,20 @@ An inventory is a plain Python file that lists hosts and attaches configuration 
 Start from the defaults and override only what differs:
 
 ```python title="inventory.py"
-from nullforge.models.users import Shell
-from nullforge.molds import UserMold
+from nullforge.models.users import Shell, UserRole
+from nullforge.molds import UserMold, UsersMold
 from nullforge.molds.defaults import BASE_FEATURES, BASE_SYSTEM
 from nullforge.molds.utils import merge_features, merge_system
 
-users = UserMold(
-    manage=True,
-    name="core",
-    shell=Shell.ZSH,
-    fetch_key_from_github="your-github-username",
+users = UsersMold(
+    users=[
+        UserMold(
+            name="core",
+            role=UserRole.ADMIN,
+            shell=Shell.ZSH,
+            fetch_key_from_github="your-github-username",
+        ),
+    ]
 )
 
 hosts = [

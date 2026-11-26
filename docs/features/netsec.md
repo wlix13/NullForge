@@ -8,7 +8,7 @@ SSH hardening, a default-deny firewall, and kernel network tuning.
 
 Directives edited in `/etc/ssh/sshd_config`:
 
-- `PasswordAuthentication no` - only when [`users.manage`](users.md) is true.
+- `PasswordAuthentication no` - only when [`users` rune](users.md) is active (i.e., `features.users` list is non-empty).
 - `PermitRootLogin no`
 - `UseDNS yes`
 

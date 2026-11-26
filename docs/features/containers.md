@@ -15,7 +15,7 @@ A container runtime with a sandboxed-by-default configuration.
 ### docker
 
 - Installs Docker Engine with the official `get.docker.com` script (skipped when `docker` is already present).
-- Adds the [managed user](users.md) to the `docker` group when `users.manage` is on.
+- Adds `admin` role users from [`features.users`](users.md) to the `docker` group.
 - Installs gVisor and registers `runsc`:
   on Debian/Ubuntu from the official APT repository;
   on RHEL by fetching `runsc` + containerd shim binaries, then `runsc install` promotes it to Docker's **default runtime** (with a daemon reload).
@@ -32,7 +32,7 @@ Installs `podman`, `podman-compose`, and the `crun` runtime from distro packages
 Rootless prerequisites come along: `passt` (the `pasta` network backend) and `uidmap` on Debian/Ubuntu (`shadow-utils` on RHEL) for `newuidmap`/`newgidmap`.
 
 `podman-auto-update.timer` is enabled system-wide.
-When `users.manage` is on, the [managed user](users.md) also gets lingering enabled (`loginctl enable-linger`) and the same timer enabled in its user session, so rootless containers labelled `io.containers.autoupdate` are refreshed daily.
+When `users` rune is active, `admin` role users also get lingering enabled (`loginctl enable-linger`) and the same timer enabled in their user session, so rootless containers labelled `io.containers.autoupdate` are refreshed daily.
 
 ## Configuration (`features.containers`)
 

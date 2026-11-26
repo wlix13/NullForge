@@ -5,20 +5,20 @@ The full cast visits features in the order below and deploys the ones whose `is_
 
 `prepare` and `base` are not features - they [always run first](base.md).
 
-| Feature | Rune | Default | Active when |
-| --- | --- | --- | --- |
-| [Cloudflare WARP](warp.md) | `warp` | off | `install = true` |
-| [DNS](dns.md) | `dns` | **on** (Blocky) | `mode != "none"` |
-| [Users](users.md) | `users` | **on** | `manage = true` |
-| [Network security](netsec.md) | `netsec` | **on** | `install = true` |
-| [Shell profiles](profiles.md) | `profiles` | **on** (root only) | `for_root or for_user` |
-| [Zero Trust Tunnel](zerotrust.md) | `zerotrust` | off | `install = true` |
-| [Containers](containers.md) | `containers` | off | `install = true` |
-| [Monitoring](monitoring.md) | `monitoring` | off | `install = true` |
-| [HAProxy](haproxy.md) | `haproxy` | off | `install = true` |
-| [Xray](xray.md) | `xray` | off | `install = true` |
-| [Tor](tor.md) | `tor` | off | `install = true` |
-| [Telemt](telemt.md) | `telemt` | off | `install = true` |
+|||| Feature | Rune | Default | Active when ||
+|||| --- | --- | --- | --- ||
+|||| [Cloudflare WARP](warp.md) | `warp` | off | `install = true` ||
+|||| [DNS](dns.md) | `dns` | **on** (Blocky) | `mode != "none"` ||
+|||| [Users](users.md) | `users` | **on** (user core, admin) | `features.users` list non-empty ||
+|||| [Network security](netsec.md) | `netsec` | **on** | `install = true` ||
+|||| [Shell profiles](profiles.md) | `profiles` | **on** (root only) | `for_root` is true or `users` list non-empty ||
+|||| [Zero Trust Tunnel](zerotrust.md) | `zerotrust` | off | `install = true` ||
+|||| [Containers](containers.md) | `containers` | off | `install = true` ||
+|||| [Monitoring](monitoring.md) | `monitoring` | off | `install = true` ||
+|||| [HAProxy](haproxy.md) | `haproxy` | off | `install = true` ||
+|||| [Xray](xray.md) | `xray` | off | `install = true` ||
+|||| [Tor](tor.md) | `tor` | off | `install = true` ||
+|||| [Telemt](telemt.md) | `telemt` | off | `install = true` ||
 
 Turning a default-on feature off is a one-line layer:
 

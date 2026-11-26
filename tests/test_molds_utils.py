@@ -1,7 +1,8 @@
 import pytest
 
 from nullforge.models.dns import DnsMode
-from nullforge.molds import DnsMold, FeaturesMold, NetSecMold, ProfilesMold, SystemMold, UserMold, WarpMold
+from nullforge.models.users import UserRole
+from nullforge.molds import DnsMold, FeaturesMold, NetSecMold, ProfilesMold, SystemMold, UserMold, UsersMold, WarpMold
 from nullforge.molds.features import iter_runes
 from nullforge.molds.utils import (
     _deep_merge_dicts,
@@ -57,6 +58,41 @@ class TestMergeFeatures:
         dns2 = DnsMold(mode=DnsMode.DOT_RESOLVED)
         result = merge_features(base, dns1, dns2)
         assert result.dns.mode == DnsMode.DOT_RESOLVED
+
+    def test_users_list_replaced_wholesale(self) -> None:
+        base = FeaturesMold(users=UsersMold(users=[UserMold(name="original", role=UserRole.ADMIN)]))
+        overlay = FeaturesMold(
+            users=UsersMold(users=[UserMold(name="new", role=UserRole.DEPLOY, sudo_commands=["/bin/true"])])
+        )
+        result = merge_features(base, overlay)
+        assert len(result.users) == 1
+        assert result.users[0].name == "new"
+        assert result.users[0].role is UserRole.DEPLOY
+
+    def test_bare_userslist_layer_replaces_wholesale(self) -> None:
+        base = FeaturesMold(users=UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]))
+        overlay = UsersMold(users=[UserMold(name="ops", role=UserRole.ADMIN)])
+        result = merge_features(base, overlay)
+        assert len(result.users) == 1
+        assert result.users[0].name == "ops"
+        assert result.users[0].role is UserRole.ADMIN
+
+    def test_dict_users_layer_replaces_wholesale(self) -> None:
+        base = FeaturesMold(users=UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]))
+        overlay = {"users": {"users": [{"name": "deploy", "role": "deploy", "sudo_commands": ["/bin/true"]}]}}
+        result = merge_features(base, overlay)
+        assert len(result.users.users) == 1
+        assert result.users.users[0].name == "deploy"
+        assert result.users.users[0].role is UserRole.DEPLOY
+
+    def test_second_userslist_layer_replaces_first(self) -> None:
+        base = FeaturesMold(users=UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]))
+        layer1 = UsersMold(users=[UserMold(name="first", role=UserRole.DEPLOY, sudo_commands=["/bin/true"])])
+        layer2 = UsersMold(users=[UserMold(name="second", role=UserRole.NONE)])
+        result = merge_features(base, layer1, layer2)
+        assert len(result.users) == 1
+        assert result.users[0].name == "second"
+        assert result.users[0].role is UserRole.NONE
 
     def test_unsupported_type_raises(self) -> None:
         base = FeaturesMold()
@@ -155,19 +191,33 @@ class TestIterRunes:
         assert "dns" not in _active(f)
 
     def test_profiles_compound_activation(self) -> None:
-        f = FeaturesMold(profiles=ProfilesMold(for_root=False, for_user=False))
+        f = FeaturesMold(profiles=ProfilesMold(for_root=False))
         assert "profiles" not in _active(f)
 
-        f2 = FeaturesMold(profiles=ProfilesMold(for_root=False, for_user=True))
+        f2 = FeaturesMold(
+            profiles=ProfilesMold(for_root=False, users=["core"]),
+            users=UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]),
+        )
         assert "profiles" in _active(f2)
 
-    def test_users_manage_flag(self) -> None:
-        f = FeaturesMold(users=UserMold(manage=False))
+    def test_users_empty_list_inactive(self) -> None:
+        f = FeaturesMold(users=UsersMold())
         assert "users" not in _active(f)
+
+    def test_users_nonempty_list_active(self) -> None:
+        f = FeaturesMold(users=UsersMold(users=[UserMold(name="core")]))
+        assert "users" in _active(f)
 
     def test_active_install_flag(self) -> None:
         f = FeaturesMold(warp=WarpMold(install=True))
         assert "warp" in _active(f)
+
+    def test_users_before_profiles_in_iter_runes(self) -> None:
+        # users rune precedes profiles rune so homes exist before profiles install
+        names = [name for name, _ in iter_runes(FeaturesMold())]
+        users_idx = names.index("users")
+        profiles_idx = names.index("profiles")
+        assert users_idx < profiles_idx
 
     def test_netsec_can_be_disabled(self) -> None:
         f = FeaturesMold(netsec=NetSecMold(install=False))
@@ -175,3 +225,58 @@ class TestIterRunes:
 
         f2 = FeaturesMold()  # default install=True
         assert "netsec" in _active(f2)
+
+    def test_profiles_live_activation_no_stale_flag(self) -> None:
+        # profiles activation recomputes on every iter_runes call, no cached flag
+        f = FeaturesMold(
+            profiles=ProfilesMold(for_root=False),
+            users=UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]),
+        )
+        assert "profiles" not in _active(f)
+
+        f.profiles.users = ["core"]
+        assert "profiles" in _active(f)
+
+    def test_profiles_root_only_active(self) -> None:
+        # root-only activation pinned explicitly (for_root=True, no users => active)
+        f = FeaturesMold(
+            profiles=ProfilesMold(for_root=True),
+            users=UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]),
+        )
+        assert "profiles" in _active(f)
+
+    def test_profiles_users_list_activation(self) -> None:
+        # profiles active when users list non-empty, even if for_root=False
+        f = FeaturesMold(
+            profiles=ProfilesMold(for_root=False, users=["core"]),
+            users=UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]),
+        )
+        assert "profiles" in _active(f)
+
+    def test_profiles_inactive_when_for_root_false_and_empty_users(self) -> None:
+        f = FeaturesMold(
+            profiles=ProfilesMold(for_root=False, users=[]),
+            users=UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]),
+        )
+        assert "profiles" not in _active(f)
+
+
+class TestProfilesUsersSubsetValidation:
+    def test_rejects_unknown_user_in_profiles_users(self) -> None:
+        with pytest.raises(ValueError, match="unknown user"):
+            FeaturesMold(
+                profiles=ProfilesMold(users=["unknown"]),
+                users=UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]),
+            )
+
+    def test_accepts_known_users_in_profiles_users(self) -> None:
+        f = FeaturesMold(
+            profiles=ProfilesMold(users=["core", "ops"]),
+            users=UsersMold(
+                users=[
+                    UserMold(name="core", role=UserRole.ADMIN),
+                    UserMold(name="ops", role=UserRole.DEPLOY, sudo_commands=["/bin/true"]),
+                ]
+            ),
+        )
+        assert f.profiles.users == ["core", "ops"]

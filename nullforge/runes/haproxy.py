@@ -19,8 +19,8 @@ def deploy_haproxy() -> None:
 
     _install_haproxy(haproxy_opts)
     _ensure_pki_dir()
-    if features.users.manage:
-        _setup_acls(features.users.name)
+    for user in host.loop(features.users):
+        _setup_acls(user.name)
 
 
 def _install_haproxy(opts: HaproxyMold) -> None:

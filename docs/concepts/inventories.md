@@ -34,10 +34,11 @@ A features layer can be any of:
 | `None` | skipped; useful for conditional layers |
 
 ```python
-from nullforge.molds import DnsMold, UserMold, WarpMold
+from nullforge.molds import DnsMold, UserMold, UsersMold, WarpMold
+from nullforge.models.users import UserRole
 
 common = (
-    UserMold(manage=True, name="core"),
+    UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]),
     WarpMold(install=True),
 )
 
@@ -48,6 +49,7 @@ features = merge_features(BASE_FEATURES, *common, {"dns": {"ecs": True}})
 
     Dictionaries merge recursively, but any non-dict value - including lists - replaces the previous value outright.
     A layer that sets `netsec.firewall_rules` replaces the whole rule list; extend `BASE_FEATURES.netsec.firewall_rules` in Python if you want "default rules plus mine".
+    The same applies to `features.users` - a layer setting `users` replaces the entire list.
 
 ## Validation and coercion
 
@@ -63,7 +65,17 @@ Shared mold instances compose into one `FeaturesMold` per zone:
 
 ```python title="inventory/zones.py"
 from nullforge.models.netsec import SshHostKeyType
-from nullforge.molds import ContainersMold, FeaturesMold, FirewallRule, HaproxyMold, NetSecMold, SshMold, UserMold
+from nullforge.models.users import UserRole
+from nullforge.molds import (
+    ContainersMold,
+    FeaturesMold,
+    FirewallRule,
+    HaproxyMold,
+    NetSecMold,
+    SshMold,
+    UserMold,
+    UsersMold,
+)
 from nullforge.molds.defaults import BASE_FEATURES
 from nullforge.molds.utils import merge_features
 
@@ -75,7 +87,7 @@ netsec = NetSecMold(
     ssh=SshMold(host_keys=[SshHostKeyType.ED25519]),
 )
 
-users = UserMold(name="ops", fetch_key_from_github="your-github-username")
+users = UsersMold(users=[UserMold(name="ops", role=UserRole.ADMIN, fetch_key_from_github="your-github-username")])
 
 ZONE_FEATURES: dict[str, FeaturesMold] = {
     "web": merge_features(BASE_FEATURES, netsec, users, HaproxyMold(install=True)),
