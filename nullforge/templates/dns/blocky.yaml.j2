@@ -1,0 +1,11 @@
+upstreams:
+  groups:
+    default:
+{% for upstream in UPSTREAMS %}
+      - {{ upstream }}
+{% endfor %}
+ports:
+  dns: "{{ LISTEN_ENDPOINT }}"
+
+log:
+  level: warn

@@ -1,0 +1,141 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = [ "hatchling" ]
+
+[project]
+name = "nullforge"
+description = "Forge the server's baseline from null"
+readme = "README.md"
+maintainers = [ { name = "wlix13", email = "github@wlix13.dev" } ]
+authors = [ { name = "wlix13", email = "github@wlix13.dev" } ]
+requires-python = ">=3.13"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+]
+dynamic = [ "version" ]
+dependencies = [
+  "click",
+  "pydantic",
+  "pyinfra>=3.10,<4",
+  "rich",
+  "rich-click",
+]
+scripts.nullforge = "nullforge.cli.__main__:main"
+
+[dependency-groups]
+dev = [
+  { include-group = "tests" },
+  "deptry",
+  "import-linter",
+  "poethepoet",
+  "prek",
+  "ruff",
+  "ty",
+]
+docs = [ "zensical" ]
+tests = [ "pytest", "pytest-cov", "pytest-sugar" ]
+
+[tool.hatch]
+version.path = "nullforge/__init__.py"
+metadata.allow-direct-references = true
+build.targets.wheel.packages = [ "nullforge" ]
+
+[tool.ruff]
+line-length = 120
+lint.select = [ "E", "F", "I", "N", "S", "UP", "W", "YTT" ]
+lint.ignore = [
+  "N818", # Domain errors are named by failure mode, not with an -Error suffix
+  "S108", # Probable insecure usage of temporary file or directory
+]
+lint.per-file-ignores."tests/*" = [
+  "S101", # Use of `assert` detected
+  "S104", # Possible binding to all interfaces
+  "S105", # Hardcoded password string
+  "S106", # Hardcoded password argument
+]
+lint.isort.lines-after-imports = 2
+
+[tool.ty]
+environment.root = [ "./nullforge" ]
+
+[tool.pytest]
+ini_options.testpaths = [ "tests" ]
+ini_options.addopts = "-ra -q --tb=short --cov=nullforge --strict-markers"
+
+[tool.importlinter]
+root_package = "nullforge"
+
+[[tool.importlinter.contracts]]
+name = "deploy spine (cli -> foundry -> runes -> smithy -> molds -> models)"
+type = "layers"
+layers = [
+  "nullforge.cli | (nullforge.inventories)",
+  "nullforge.foundry",
+  "nullforge.runes",
+  "nullforge.smithy",
+  "nullforge.molds | nullforge.templates",
+  "nullforge.models",
+]
+
+[[tool.importlinter.contracts]]
+name = "models are pure value types"
+type = "forbidden"
+source_modules = [ "nullforge.models" ]
+forbidden_modules = [
+  "nullforge.cli",
+  "nullforge.foundry",
+  "nullforge.molds",
+  "nullforge.runes",
+  "nullforge.smithy",
+  "nullforge.templates",
+]
+
+[[tool.importlinter.contracts]]
+name = "templates are a leaf"
+type = "forbidden"
+source_modules = [ "nullforge.templates" ]
+forbidden_modules = [
+  "nullforge.cli",
+  "nullforge.foundry",
+  "nullforge.models",
+  "nullforge.molds",
+  "nullforge.runes",
+  "nullforge.smithy",
+]
+
+[[tool.importlinter.contracts]]
+name = "molds describe configuration, never provisioning"
+type = "forbidden"
+source_modules = [ "nullforge.molds" ]
+forbidden_modules = [
+  "nullforge.cli",
+  "nullforge.foundry",
+  "nullforge.runes",
+  "nullforge.smithy",
+  "nullforge.templates",
+]
+
+[[tool.importlinter.contracts]]
+name = "runes are self-contained"
+type = "independence"
+modules = [
+  "nullforge.runes.*",
+]
+
+[tool.poe]
+executor.type = "uv"
+tasks.format = "ruff format --check ."
+tasks."format:fix" = "ruff format ."
+tasks.lint = "ruff check ."
+tasks."lint:fix" = "ruff check --fix ."
+tasks."lint:md" = "prek run markdownlint-cli2 --all-files"
+tasks.typecheck = "ty check"
+tasks.lint-imports = "lint-imports --no-logo"
+tasks.deptry = "deptry ."
+tasks.check = [ "format", "lint", "typecheck", "lint-imports", "deptry" ]
+tasks.docs = { cmd = "zensical build --clean --strict", executor = { group = "docs" } }
+tasks."docs:dev" = { cmd = "zensical serve", executor = { group = "docs" } }
+tasks.tests = "pytest"

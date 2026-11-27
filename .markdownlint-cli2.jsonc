@@ -1,0 +1,25 @@
+{
+  "gitignore": true,
+
+  // Generated, boilerplate and vendored - not authored to this style.
+  "ignores": [
+    "CHANGELOG.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    ".github/ISSUE_TEMPLATE/**",
+  ],
+
+  "config": {
+    "default": true,
+
+    // Prose is one sentence per line; tables pad cells but not the delimiter row.
+    "MD013": false,
+    "MD060": false,
+
+    "MD046": false,
+
+    // mkdocs admonition blocks
+    "MD033": {
+      "allowed_elements": ["div"],
+    },
+  },
+}

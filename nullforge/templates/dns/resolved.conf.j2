@@ -1,0 +1,13 @@
+[Resolve]
+{% if DOT -%}
+DNS={{ DNS_SERVERS | join(' ') }}
+DNSOverTLS=yes
+{% elif DOH -%}
+DNS=127.0.0.1:5053
+DNSOverTLS=no
+{% endif -%}
+DNSSEC=yes
+LLMNR=no
+Cache=yes
+CacheFromLocalhost=yes
+ReadEtcHosts=yes

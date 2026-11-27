@@ -1,0 +1,290 @@
+"""Containers deployment module."""
+
+import re
+
+from pyinfra.context import host
+from pyinfra.facts.files import File, FileContents
+from pyinfra.facts.server import Arch, Users, Which
+from pyinfra.operations import apt, files, server, systemd
+
+from nullforge.models.containers import ContainersBackendType
+from nullforge.models.users import UserRole
+from nullforge.molds import ContainersMold, FeaturesMold
+from nullforge.smithy.arch import deb_arch
+from nullforge.smithy.http import curl_args
+from nullforge.smithy.packages import get_pm
+from nullforge.smithy.versions import GPG_KEYS, STATIC_URLS
+
+
+SUBID_MIN = 100000
+"""First host id handed out to rootless users, below it live real accounts."""
+
+SUBID_COUNT = 65536
+"""Ids per rootless user, matches shadow's SUB_UID_COUNT default."""
+
+
+def deploy_containers() -> None:
+    """Deploy containers runtime and related tools."""
+
+    features: FeaturesMold = host.data.features
+    containers_opts: ContainersMold = features.containers
+
+    admin_users = [u.name for u in features.users if u.role is UserRole.ADMIN]
+
+    match containers_opts.backend_type:
+        case ContainersBackendType.DOCKER:
+            _install_docker()
+            for username in host.loop(admin_users):
+                _add_user_to_docker_group(username)
+            _install_gvisor()
+        case ContainersBackendType.PODMAN:
+            _install_crun()
+            _install_podman()
+            _ensure_subid_ranges(admin_users)
+            _enable_podman_autoupdate(admin_users)
+        case ContainersBackendType.CRIO:
+            raise ValueError("CRIO is not supported yet")
+
+    if containers_opts.skopeo:
+        _install_skopeo()
+
+
+def _install_gvisor() -> None:
+    """Install gVisor runtime."""
+
+    pm = get_pm()
+    if pm.is_debian_based:
+        _install_gvisor_debian()
+    elif pm.is_rhel_based:
+        _install_gvisor_rhel()
+    else:
+        host.noop(f"gVisor install skipped: unsupported distro {pm.distro_name}")
+
+
+def _install_gvisor_debian() -> None:
+    """Install gVisor on Debian/Ubuntu via the official APT repo."""
+
+    gvisor_key_path = "/usr/share/keyrings/gvisor-archive-keyring.gpg"
+    apt.key(
+        name="Install gVisor GPG key",
+        src=GPG_KEYS["gvisor"],
+        dest=gvisor_key_path,
+        _sudo=True,
+        _retries=3,
+        _retry_delay=10,
+    )
+
+    apt.sources_file(
+        name="Write gVisor repository source",
+        filename="gvisor",
+        uris="https://storage.googleapis.com/gvisor/releases",
+        suites="release",
+        components="main",
+        architectures=deb_arch(),
+        signed_by=gvisor_key_path,
+        _sudo=True,
+    )
+
+    pm = get_pm()
+    pm.update(
+        name="Update package repositories after adding gVisor repository",
+        _sudo=True,
+    )
+
+    pm.install(
+        name="Install gVisor",
+        packages=["runsc"],
+        _sudo=True,
+    )
+
+
+def _install_gvisor_rhel() -> None:
+    """Install gVisor binaries manually and register as Docker's default runtime."""
+
+    runsc_path = "/usr/local/bin/runsc"
+    if host.get_fact(File, runsc_path):
+        host.noop("gVisor already installed")
+        return
+
+    arch = host.get_fact(Arch)
+    base_url = f"https://storage.googleapis.com/gvisor/releases/release/latest/{arch}"
+    runsc_url = f"{base_url}/runsc"
+    shim_url = f"{base_url}/containerd-shim-runsc-v1"
+
+    files.download(
+        name="Download gVisor runsc binary",
+        src=runsc_url,
+        dest=runsc_path,
+        mode="0755",
+        extra_curl_args=curl_args(runsc_url),
+        _sudo=True,
+        _retries=3,
+        _retry_delay=10,
+    )
+
+    files.download(
+        name="Download gVisor containerd-shim",
+        src=shim_url,
+        dest="/usr/local/bin/containerd-shim-runsc-v1",
+        mode="0755",
+        extra_curl_args=curl_args(shim_url),
+        _sudo=True,
+        _retries=3,
+        _retry_delay=10,
+    )
+
+    register_runtime = server.shell(
+        name="Register gVisor as Docker's default runtime",
+        commands=[
+            # `runsc install` creates/updates /etc/docker/daemon.json with the runsc runtime entry.
+            f"{runsc_path} install",
+            # Promote runsc to default-runtime so containers use it without `--runtime=runsc`.
+            'jq \'. + {"default-runtime": "runsc"}\' /etc/docker/daemon.json'
+            " > /etc/docker/daemon.json.tmp && mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json",
+        ],
+        _sudo=True,
+    )
+
+    systemd.service(
+        name="Reload Docker to pick up gVisor runtime",
+        service="docker",
+        reloaded=True,
+        _sudo=True,
+        _if=register_runtime.did_change,
+    )
+
+
+def _install_docker() -> None:
+    """Install Docker using official installation script."""
+
+    if host.get_fact(Which, command="docker"):
+        return
+
+    get_docker_path = "/tmp/get-docker.sh"
+    files.download(
+        name="Download Docker installation script",
+        src=STATIC_URLS["docker_install"],
+        dest=get_docker_path,
+        mode="0755",
+        extra_curl_args=curl_args(STATIC_URLS["docker_install"]),
+        _retries=3,
+        _retry_delay=10,
+    )
+
+    server.shell(
+        name="Install Docker",
+        commands=[f"bash {get_docker_path}"],
+        _sudo=True,
+    )
+
+
+def _add_user_to_docker_group(username: str) -> None:
+    """Add user to docker group."""
+
+    server.user(
+        name=f"Add user {username} to docker group",
+        user=username,
+        groups=["docker"],
+        append=True,
+        _sudo=True,
+    )
+
+
+def _install_skopeo() -> None:
+    """Install skopeo."""
+
+    pm = get_pm()
+    pm.install(
+        name="Install skopeo",
+        packages=["skopeo"],
+        _sudo=True,
+    )
+
+
+def _install_podman() -> None:
+    """Install Podman."""
+
+    pm = get_pm()
+    pm.install(
+        name="Install Podman",
+        packages=[
+            "podman",
+            "podman-compose",
+            "passt",
+            "uidmap",
+        ],
+        _sudo=True,
+    )
+
+
+def _ensure_subid_ranges(users: list[str]) -> None:
+    """Allocate subuid/subgid ranges for users when absent."""
+
+    existing_users = host.get_fact(Users)
+    allocations: list[tuple[str, str, int]] = []
+
+    for path in ("/etc/subuid", "/etc/subgid"):
+        raw_entries = host.get_fact(FileContents, path)
+        entries = list(raw_entries or [])
+        next_start = _next_subid_start(entries)
+
+        for user in users:
+            if raw_entries is not None and user not in existing_users:
+                host.noop(f"useradd allocates {path} range when creating {user}")
+                continue
+
+            if any(entry.startswith(f"{user}:") for entry in entries):
+                host.noop(f"{user} already has {path} range")
+                continue
+
+            allocations.append((path, user, next_start))
+            next_start += SUBID_COUNT
+
+    for path, user, start in host.loop(allocations):
+        files.line(
+            name=f"Allocate {path} range for {user}",
+            path=path,
+            line=f"^{re.escape(user)}:",
+            replace=f"{user}:{start}:{SUBID_COUNT}",
+            _sudo=True,
+        )
+
+
+def _next_subid_start(entries: list[str]) -> int:
+    ends = [int(start) + int(count) for _, start, count in (e.split(":") for e in entries if e.count(":") == 2)]
+    return max([SUBID_MIN, *ends])
+
+
+def _enable_podman_autoupdate(admin_users: list[str]) -> None:
+    """Enable podman auto-update timer, rootful and rootless."""
+
+    systemd.service(
+        name="Enable podman auto-update timer",
+        service="podman-auto-update.timer",
+        running=True,
+        enabled=True,
+        _sudo=True,
+    )
+
+    for user in host.loop(admin_users):
+        server.shell(
+            name=f"Enable rootless podman auto-update timer for {user}",
+            commands=[
+                f"loginctl enable-linger {user}",
+                f"runuser -u {user} -- env XDG_RUNTIME_DIR=/run/user/$(id -u {user})"
+                " systemctl --user enable --now podman-auto-update.timer",
+            ],
+            _sudo=True,
+        )
+
+
+def _install_crun() -> None:
+    pm = get_pm()
+    pm.install(
+        name="Install crun",
+        packages=["crun"],
+        _sudo=True,
+    )
+
+
+deploy_containers()

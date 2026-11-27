@@ -1,0 +1,164 @@
+# Inventories
+
+An inventory is a standard [pyinfra inventory](https://docs.pyinfra.com/en/3.x/inventory-data.html): a Python file with a `hosts` list.
+Each host is either a bare address or an `(address, data)` tuple.
+NullForge reads two data keys - `system` and `features` - plus an optional `versions` map for [pin overrides](../guides/version-pinning.md).
+
+```python
+from nullforge.molds.defaults import BASE_FEATURES, BASE_SYSTEM
+from nullforge.molds.utils import merge_features, merge_system
+
+hosts = [
+    (
+        "203.0.113.10",
+        {
+            "system": merge_system(BASE_SYSTEM, {"hostname": "node1.example.com"}),
+            "features": merge_features(BASE_FEATURES, ...),
+        },
+    ),
+]
+```
+
+## Defaults and layering
+
+`BASE_SYSTEM` and `BASE_FEATURES` (from `nullforge.molds.defaults`) are plain default-constructed molds.
+`merge_system` / `merge_features` (from `nullforge.molds.utils`) start from a base and deep-merge each layer in order - later layers win.
+
+A features layer can be any of:
+
+| Layer type | Example |
+| --- | --- |
+| Full `FeaturesMold` | another host's merged result |
+| Any feature sub-mold | `WarpMold(install=True)` - merged under its own key |
+| `dict` fragment | `{"warp": {"install": True}}` (sub-molds allowed as values) |
+| `None` | skipped; useful for conditional layers |
+
+```python
+from nullforge.molds import DnsMold, UserMold, UsersMold, WarpMold
+from nullforge.models.users import UserRole
+
+common = (
+    UsersMold(users=[UserMold(name="core", role=UserRole.ADMIN)]),
+    WarpMold(install=True),
+)
+
+features = merge_features(BASE_FEATURES, *common, {"dns": {"ecs": True}})
+```
+
+!!! warning "Deep-merge is per-key"
+
+    Dictionaries merge recursively, but any non-dict value - including lists - replaces the previous value outright.
+    A layer that sets `netsec.firewall_rules` replaces the whole rule list; extend `BASE_FEATURES.netsec.firewall_rules` in Python if you want "default rules plus mine".
+    The same applies to `features.users` - a layer setting `users` replaces the entire list.
+
+## Validation and coercion
+
+The foundry coerces whatever the inventory provided - `None`, a `dict`, or a mold instance - into validated `SystemMold` / `FeaturesMold` objects before any rune runs.
+Missing keys fall back to mold defaults; unknown keys are rejected because every mold forbids extra fields.
+
+## Scaling to a fleet
+
+Inventories are Python, so fleet structure is ordinary code.
+A pattern that works well in practice: per-zone feature presets, a YAML host registry, and a small builder that turns them into pyinfra groups.
+
+Shared mold instances compose into one `FeaturesMold` per zone:
+
+```python title="inventory/zones.py"
+from nullforge.models.netsec import SshHostKeyType
+from nullforge.models.users import UserRole
+from nullforge.molds import (
+    ContainersMold,
+    FeaturesMold,
+    FirewallRule,
+    HaproxyMold,
+    NetSecMold,
+    SshMold,
+    UserMold,
+    UsersMold,
+)
+from nullforge.molds.defaults import BASE_FEATURES
+from nullforge.molds.utils import merge_features
+
+netsec = NetSecMold(
+    firewall_rules=[
+        FirewallRule(port=443, comment="HTTPS"),
+        FirewallRule(port=22, proto="tcp", from_ip="203.0.113.7", comment="Admin SSH"),
+    ],
+    ssh=SshMold(host_keys=[SshHostKeyType.ED25519]),
+)
+
+users = UsersMold(users=[UserMold(name="ops", role=UserRole.ADMIN, fetch_key_from_github="your-github-username")])
+
+ZONE_FEATURES: dict[str, FeaturesMold] = {
+    "web": merge_features(BASE_FEATURES, netsec, users, HaproxyMold(install=True)),
+    "workers": merge_features(BASE_FEATURES, netsec, users, ContainersMold(install=True)),
+}
+```
+
+Host membership lives in data, not code - one YAML entry per host, with an optional `overrides` fragment deep-merged onto the zone preset:
+
+```yaml title="inventory/hosts.yaml"
+web:
+  - address: 203.0.113.10
+    hostname: web1.example.com
+  - address: 203.0.113.11
+    hostname: web2.example.com
+    overrides:
+      netsec:
+        firewall: false
+workers:
+  - address: 203.0.113.20
+    hostname: worker1.example.com
+```
+
+The builder exposes one module-level list per zone - pyinfra treats each as a named group, so `--limit web` targets a whole zone:
+
+```python title="inventory/main.py"
+from pathlib import Path
+
+import yaml
+
+from nullforge.molds.defaults import BASE_SYSTEM
+from nullforge.molds.utils import merge_features, merge_system
+
+from inventory.zones import ZONE_FEATURES
+
+DATA: dict = yaml.safe_load((Path(__file__).parent / "hosts.yaml").read_text()) or {}
+
+
+def _build(zone: str) -> list:
+    rows = []
+    for entry in DATA.get(zone, []):
+        rows.append(
+            (
+                entry["address"],
+                {
+                    "zone": zone,
+                    "system": merge_system(BASE_SYSTEM, {"hostname": entry["hostname"]}),
+                    "features": merge_features(ZONE_FEATURES[zone], entry.get("overrides")),
+                },
+            )
+        )
+    return rows
+
+
+for zone in ZONE_FEATURES:
+    globals()[zone] = _build(zone)
+```
+
+```bash
+nullforge cast -i inventory/main.py --limit web --dry
+```
+
+## Secrets in inventories
+
+Inventories are code; secrets in them (tunnel tokens, proxy user secrets) end up on disk.
+Keep real inventories out of public repos, or load secrets from the environment.
+
+Sensitive mold fields are redacted as `***` in pyinfra's `--debug-inventory` output, so inspecting a plan does not leak them.
+
+## Debugging
+
+```bash
+nullforge cast -i inventory.py --debug-inventory   # dump merged host data (pass-through to pyinfra)
+```

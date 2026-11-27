@@ -1,0 +1,52 @@
+# Molds
+
+Molds are Pydantic models that shape and validate every piece of NullForge configuration.
+If a value reaches a rune, it went through a mold first.
+
+## BaseMold
+
+Every mold extends `BaseMold` (`nullforge/molds/base_mold.py`), which sets the shared behaviour:
+
+- **`extra="forbid"`** - unknown keys are validation errors, so typos fail the cast instead of silently deploying defaults.
+- **`is_active`** - the activation protocol used for [rune dispatch](runes.md#dispatch); each feature sub-mold implements it.
+- **`to_json()`** - JSON-mode serialization for pyinfra's `--debug-inventory`, with `_sensitive_fields` values redacted as `***`.
+
+## The top-level molds
+
+Two molds cover a host:
+
+- **`SystemMold`** - base system state: packages, locales, timezone, hostname, swap, IPv6.
+  Consumed by the always-on [base rune](../features/base.md).
+- **`FeaturesMold`** - one field per feature, each a sub-mold with its own defaults.
+
+Field order is deploy order.
+Everything else is derived from these fields - the allowed [merge layers](inventories.md), the feature-to-mold mapping, and rune dispatch - so adding a feature means adding a field, not editing plumbing.
+
+## Activation
+
+Every feature sub-mold implements `is_active`.
+Most simply return `self.install`; the exceptions encode their own semantics:
+
+- `DnsMold` - active while `mode != "none"`.
+- `UsersMold` - active while the users list is non-empty.
+- `ProfilesMold` - active while `for_root` is true or `users` list is non-empty.
+
+A sub-mold may also rename its rune or opt out of automatic dispatch - see [dispatch](runes.md#dispatch).
+
+## Validation beyond types
+
+Molds validate coherence, not just shapes - a bad combination fails at plan time with a readable error, never mid-deploy.
+Each [feature page](../features/index.md) documents its own validators.
+
+## Models vs molds
+
+Domain types and constants - `DnsMode`, `Shell`, `WarpEngineType`, `SwapType`, ... - live in `nullforge.models.<domain>` and are imported from there directly:
+
+```python
+from nullforge.models.dns import DnsMode
+from nullforge.molds import DnsMold
+
+dns = DnsMold(mode=DnsMode.DOT_RESOLVED)
+```
+
+`nullforge.molds` exports only the molds.

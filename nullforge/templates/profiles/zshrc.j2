@@ -1,0 +1,46 @@
+export ZSH="{{ home }}/.oh-my-zsh"
+ZSH_THEME=""
+
+case ":$PATH:" in
+  *:/usr/local/bin:*) ;;
+  *) export PATH="/usr/local/sbin:/usr/local/bin:$PATH" ;;
+esac
+
+plugins=(
+    git
+    docker
+    zsh-autosuggestions
+    zsh-syntax-highlighting
+    ohmyzsh-full-autoupdate
+)
+
+zstyle ':omz:update' mode auto
+
+source $ZSH/oh-my-zsh.sh
+
+[ -f "$HOME/.atuin/bin/env" ] && . "$HOME/.atuin/bin/env"
+
+command -v atuin    >/dev/null 2>&1 && eval "$(atuin init zsh)"
+command -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"
+command -v direnv   >/dev/null 2>&1 && eval "$(direnv hook zsh)"
+if command -v zoxide >/dev/null 2>&1; then
+    eval "$(zoxide init zsh)"
+    alias cd='z'
+fi
+
+# Aliases
+alias tailf='tail -f'
+command -v btop  >/dev/null 2>&1 && alias top='btop'
+command -v eza   >/dev/null 2>&1 && alias ls='eza'
+command -v nvim  >/dev/null 2>&1 && alias vim='nvim'
+command -v duf   >/dev/null 2>&1 && alias df='duf'
+command -v doggo >/dev/null 2>&1 && alias dig='doggo'
+# `bat` named `batcat` on Debian/Ubuntu
+# `bat` on RHEL/Fedora
+if command -v batcat >/dev/null 2>&1; then
+    alias cat='batcat --style=plain --paging=never'
+elif command -v bat >/dev/null 2>&1; then
+    alias cat='bat --style=plain --paging=never'
+fi
+
+# Edits between the markers are overwritten on deploy - put host-specific config below the end marker

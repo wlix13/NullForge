@@ -1,0 +1,27 @@
+[Unit]
+Description=Cloudflare Zero Trust Tunnel
+Wants=network-online.target
+After=network-online.target{% if ROUTE_THROUGH_WARP %} {{ WARP_SERVICE }}.service{% endif %}
+
+{% if ROUTE_THROUGH_WARP %}
+Requires={{ WARP_SERVICE }}.service
+{% endif %}
+
+[Service]
+User=cloudflare
+Group=cloudflare
+Type=simple
+
+ExecStart=/usr/bin/cloudflared --config {{ CONFIG_PATH }} tunnel run
+{% if ROUTE_THROUGH_WARP %}
+ExecStartPost={{ WORKDIR }}/zt-tunnel-warp.sh up {{ WARP_IFACE }}
+ExecStopPost={{ WORKDIR }}/zt-tunnel-warp.sh down {{ WARP_IFACE }}
+{% endif %}
+AmbientCapabilities=CAP_NET_ADMIN
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

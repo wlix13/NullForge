@@ -1,0 +1,6 @@
+proxy-dns: true
+proxy-dns-port: {{ PORT }}
+proxy-dns-upstream:
+{% for upstream in UPSTREAMS -%}
+  - {{ upstream }}
+{% endfor -%}
