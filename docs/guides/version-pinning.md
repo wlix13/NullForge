@@ -14,7 +14,7 @@ A cast converges every host to the pin; bumping a pin re-installs on the next ca
 | `usque`, `wgcf` | [WARP](../features/warp.md) |
 | `cloudflared` | [Zero Trust Tunnel](../features/zerotrust.md) |
 | `blocky` | [DNS](../features/dns.md) |
-| `telemt` | [Telemt](../features/telemt.md) |
+| `telemt`, `zapret2`, `caddy` | [Telemt](../features/telemt.md) |
 
 ## Overriding per host
 

@@ -13,6 +13,7 @@ from .base_mold import BaseMold
 TelemtIpPreference = Literal[4, 6]
 """Address family telemt prefers when both are available (network.prefer)."""
 
+
 class SynfixType(StrEnum):
     """MEKO MTProto fix variant applied by telemt-synfix.sh."""
 
