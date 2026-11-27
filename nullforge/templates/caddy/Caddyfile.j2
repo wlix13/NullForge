@@ -1,0 +1,7 @@
+# Managed by NullForge. Local edits are overwritten on redeploy.
+
+{{ WEB_HOST }} {
+	reverse_proxy 127.0.0.1:{{ WEB_PORT }} {
+		header_up X-Forwarded-For {remote_host}
+	}
+}

@@ -24,6 +24,7 @@ DEFAULT_VERSIONS = {
     "direnv": "v2.37.1",
     "telemt": "3.4.23",
     "zapret2": "v1.0.3",
+    "caddy": "v2.10.2",
     "nerd_fonts": "v3.4.0",
 }
 """Version pins (override per-host via inventory if needed)."""
@@ -44,6 +45,7 @@ VERSION_COMMANDS: dict[str, str | None] = {
     "direnv": "{bin} version",
     "telemt": "{bin} --version",
     "zapret2": None,  # nfqws2 --version output not stable, tracked via marker file
+    "caddy": "{bin} version",
 }
 """How each pinned tool reports its installed version (None = tracked via marker file)."""
 
@@ -233,6 +235,16 @@ class Versions:
             "bol-van/zapret2",
             version,
             f"zapret2-{version}.tar.gz",
+        )
+
+    def caddy_tar(self) -> str:
+        # asset name embeds version without leading v
+        version = self.versions["caddy"]
+        arch = self._arch_select("amd64", "arm64")
+        return self._release_url(
+            "caddyserver/caddy",
+            version,
+            f"caddy_{version.removeprefix('v')}_linux_{arch}.tar.gz",
         )
 
 

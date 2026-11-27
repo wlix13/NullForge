@@ -1,6 +1,7 @@
 """Telemt MTProto proxy deployment module."""
 
 import shlex
+import socket
 
 import click
 from pyinfra import logger
@@ -41,6 +42,10 @@ ZAPRET2_ARCH_DIRS = {
 }
 ZAPRET2_LUA_DIR = f"{ZAPRET2_DIR}/lua"
 ZAPRET2_MTPROTO_LUA = f"{ZAPRET2_LUA_DIR}/mtproto.lua"
+CADDY_BIN = "/usr/local/bin/caddy"
+CADDYFILE = "/etc/caddy/Caddyfile"
+CADDY_UNIT = "/etc/systemd/system/telemt-caddy.service"
+DECOY_DIR = "/var/www/telemt-decoy"
 SERVICE_NAME = "telemt"
 SERVICE_UNIT = f"/etc/systemd/system/{SERVICE_NAME}.service"
 LOG = logger
@@ -64,6 +69,7 @@ def deploy_telemt() -> None:
 
     teleproxy_op = _deploy_teleproxy_script() if warp_active else None
     synfix_ops = _deploy_synfix_scripts(telemt_opts) if telemt_opts.synfix else []
+    web_front_ops = _deploy_web_front(telemt_opts) if telemt_opts.mode_web else []
 
     unit_op = _deploy_service_unit(
         telemt_opts,
@@ -80,7 +86,7 @@ def deploy_telemt() -> None:
 
     # The helper scripts run from telemt's ExecStartPre/ExecStopPost, so a change
     # to either takes effect on the next telemt (re)start.
-    restart_ops = [op for op in (binary_op, config_op, teleproxy_op, *synfix_ops, unit_op) if op]
+    restart_ops = [op for op in (binary_op, config_op, teleproxy_op, *synfix_ops, *web_front_ops, unit_op) if op]
     systemd.service(
         name="Restart telemt on change",
         service=SERVICE_NAME,
@@ -161,6 +167,18 @@ def _install_telemt() -> OperationMeta | None:
     )
 
 
+def _web_public_addr(opts: TelemtMold) -> str:
+    """web.vhosts.public_addr as a literal ip:port, defaults to resolving web_host (points at this host)."""
+
+    if opts.web_public_addr:
+        return opts.web_public_addr
+    try:
+        ip = socket.gethostbyname(opts.web_host)
+    except OSError as e:
+        raise ValueError(f"cannot resolve web_host {opts.web_host!r} for web_public_addr: {e}") from e
+    return f"{ip}:443"
+
+
 def _deploy_config(opts: TelemtMold, warp_active: bool, warp_iface: str) -> OperationMeta:
     """Render the telemt.toml configuration."""
 
@@ -188,6 +206,13 @@ def _deploy_config(opts: TelemtMold, warp_active: bool, warp_iface: str) -> Oper
         USERS=opts.users,
         ROUTE_VIA_WARP=warp_active,
         WARP_IFACE=warp_iface,
+        WEB_ENABLED=opts.mode_web,
+        WEB_PORT=opts.web_port,
+        WEB_HOST=opts.web_host,
+        WEB_BASE_PATH=opts.web_base_path,
+        WEB_PUBLIC_ADDR=_web_public_addr(opts) if opts.mode_web else "",
+        WEB_CARRIER=opts.web_carrier,
+        WEB_USERS=([opts.web_user] if opts.web_user else list(opts.users)) if opts.mode_web else [],
         _sudo=True,
     )
 
@@ -305,6 +330,90 @@ def _deploy_zapret2_lua() -> OperationMeta:
         create_remote_dir=True,
         _sudo=True,
     )
+
+
+def _install_caddy() -> OperationMeta | None:
+    """Install the pinned caddy binary (TLS front with automatic HTTPS)."""
+
+    if is_pinned_version_installed("caddy", CADDY_BIN):
+        host.noop("caddy is already at the pinned version")
+        return None
+
+    return install_release_binary(
+        name="Install caddy binary",
+        url=get_versions().caddy_tar(),
+        dest=CADDY_BIN,
+        binary_name="caddy",
+    )
+
+
+def _deploy_web_front(opts: TelemtMold) -> list[OperationMeta]:
+    """Deploy the Caddy TLS front for telemt WEB mode. Caddy owns port 443."""
+
+    if not opts.mode_web:
+        return []
+
+    ops: list[OperationMeta] = []
+    caddy_op = _install_caddy()
+    if caddy_op:
+        ops.append(caddy_op)
+
+    ops.append(
+        files.template(
+            name="Deploy Caddyfile for telemt WEB front",
+            src=get_template_path("caddy/Caddyfile.j2"),
+            dest=CADDYFILE,
+            mode="0644",
+            jinja_env_kwargs=BLOCK_TRIM_ENV,
+            WEB_HOST=opts.web_host,
+            WEB_PORT=opts.web_port,
+            _sudo=True,
+        )
+    )
+    ops.append(
+        files.put(
+            name="Deploy WEB decoy site",
+            src=get_template_path("caddy/index.html"),
+            dest=f"{DECOY_DIR}/index.html",
+            mode="0644",
+            create_remote_dir=True,
+            _sudo=True,
+        )
+    )
+
+    unit_op = files.template(
+        name="Deploy caddy service unit",
+        src=get_template_path("systemd/telemt-caddy.service.j2"),
+        dest=CADDY_UNIT,
+        mode="0644",
+        jinja_env_kwargs=BLOCK_TRIM_ENV,
+        CADDY_BIN=CADDY_BIN,
+        CADDYFILE=CADDYFILE,
+        _sudo=True,
+    )
+    ops.append(unit_op)
+
+    systemd.daemon_reload(
+        name="Reload systemd daemon for caddy",
+        _sudo=True,
+        _if=unit_op.did_change,
+    )
+    systemd.service(
+        name="Restart caddy on change",
+        service="telemt-caddy",
+        restarted=True,
+        _sudo=True,
+        _if=any_changed(*ops),
+    )
+    systemd.service(
+        name="Ensure caddy is running and enabled",
+        service="telemt-caddy",
+        running=True,
+        enabled=True,
+        _sudo=True,
+    )
+
+    return ops
 
 
 def _deploy_service_unit(
