@@ -87,6 +87,22 @@ class TestVersionsUrls:
             url = v.telemt_tar()
         assert "/releases/latest/download/" in url
 
+    def test_zapret2_tar_url(self) -> None:
+        with _versions_context() as v:
+            version = DEFAULT_VERSIONS["zapret2"]
+            assert (
+                v.zapret2_tar()
+                == f"https://github.com/bol-van/zapret2/releases/download/{version}/zapret2-{version}.tar.gz"
+            )
+
+    def test_caddy_tar_arch_selection(self) -> None:
+        version = DEFAULT_VERSIONS["caddy"]
+        asset = f"caddy_{version.removeprefix('v')}_linux_amd64.tar.gz"
+        with _versions_context("x86_64") as v:
+            assert v.caddy_tar() == f"https://github.com/caddyserver/caddy/releases/download/{version}/{asset}"
+        with _versions_context("arm64") as v:
+            assert "linux_arm64.tar.gz" in v.caddy_tar()
+
     def test_nvim_x86_is_appimage(self) -> None:
         with _versions_context("x86_64") as v:
             url = v.nvim_appimage()
