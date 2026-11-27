@@ -1,6 +1,7 @@
 """Telemt (MTProto proxy) configuration mold."""
 
 import re
+from enum import StrEnum
 from typing import ClassVar, Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -10,6 +11,20 @@ from .base_mold import BaseMold
 
 TelemtIpPreference = Literal[4, 6]
 """Address family telemt prefers when both are available (network.prefer)."""
+
+
+class SynfixType(StrEnum):
+    """MEKO MTProto fix variant applied by telemt-synfix.sh."""
+
+    V2 = "v2"
+    """SYN rate limit per source IP, iOS bypass via TTL+Length."""
+
+    V3 = "v3"
+    """Same limit, iOS matched by u32 TCP fingerprint (works when load balancers break TTL+Length)."""
+
+    V4 = "v4"
+    """zapret2 nfqws2 server-side desync, no SYN limit. Clients whose router runs zapret cannot connect."""
+
 
 _SECRET_RE = re.compile(r"^[0-9a-f]{32}$")
 """Telemt user secrets are 16 bytes rendered as 32 lowercase hex characters."""
@@ -100,9 +115,13 @@ class TelemtMold(BaseMold):
         default=False,
         description="Route Telegram-bound egress through WARP via per-uid policy routing",
     )
-    synfix: bool = Field(
-        default=False,
-        description="Apply MEKO SYN rate-limiting fix",
+    synfix: SynfixType | None = Field(
+        default=None,
+        description=(
+            "MEKO MTProto fix variant applied by telemt-synfix.sh, or None to disable: "
+            "v2 (iOS bypass via TTL+Length), v3 (iOS bypass via u32 TCP fingerprint), "
+            "v4 (zapret2 nfqws2 desync, no SYN limit)"
+        ),
     )
 
     @property

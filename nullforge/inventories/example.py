@@ -72,11 +72,11 @@ telemt = TelemtMold(
         "example": "bf777cca8384a074a671460d51e4e31f",
     },
     route_via_warp=True,
-    synfix=True,
+    synfix="v2",
 )
 """Telemt MTProto proxy preset with Fake-TLS masking.
 Telegram-bound egress is routed through WARP (enabled above) via per-uid policy routing,
-and the MEKO SYN rate-limiting fix is applied.
+and the MEKO SYN rate-limiting fix (v2) is applied.
 """
 
 _overrides = (

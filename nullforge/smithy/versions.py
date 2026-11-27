@@ -23,6 +23,7 @@ DEFAULT_VERSIONS = {
     "blocky": "v0.33.0",
     "direnv": "v2.37.1",
     "telemt": "3.4.23",
+    "zapret2": "v1.0.3",
     "nerd_fonts": "v3.4.0",
 }
 """Version pins (override per-host via inventory if needed)."""
@@ -42,6 +43,7 @@ VERSION_COMMANDS: dict[str, str | None] = {
     "blocky": "{bin} version",
     "direnv": "{bin} version",
     "telemt": "{bin} --version",
+    "zapret2": None,  # nfqws2 --version output not stable, tracked via marker file
 }
 """How each pinned tool reports its installed version (None = tracked via marker file)."""
 
@@ -222,6 +224,15 @@ class Versions:
             "telemt/telemt",
             tag,
             f"telemt-{arch}-linux-gnu.tar.gz",
+        )
+
+    def zapret2_tar(self) -> str:
+        # asset name embeds version, `latest` would 404
+        version = self.versions["zapret2"]
+        return self._release_url(
+            "bol-van/zapret2",
+            version,
+            f"zapret2-{version}.tar.gz",
         )
 
 
