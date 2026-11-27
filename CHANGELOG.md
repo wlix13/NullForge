@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0](https://github.com/wlix13/NullForge/compare/v0.3.4...v0.4.0) (2026-11-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **telemt:** add WEB proxy mode behind telemt-caddy TLS front
+* **telemt:** support synfix fix variants v2, v3, v4
+
+### Features
+
+* **telemt:** add WEB proxy mode behind telemt-caddy TLS front ([5fd7a93](https://github.com/wlix13/NullForge/commit/5fd7a93498dfe68bbe197b825d5f37ca9270908b))
+* **telemt:** support synfix fix variants v2, v3, v4 ([964b3c2](https://github.com/wlix13/NullForge/commit/964b3c2235732a2b015c769e5522f42430eeea1a))
+
+
+### Documentation
+
+* **telemt:** document synfix variants and WEB proxy mode ([fbac499](https://github.com/wlix13/NullForge/commit/fbac49959b3406b899e0cfe6db4c659d5d112692))
+
 ## [0.3.4](https://github.com/wlix13/NullForge/compare/v0.3.3...v0.3.4) (2026-11-26)
 
 
