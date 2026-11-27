@@ -1,14 +1,19 @@
 """Telemt MTProto proxy deployment module."""
 
+import shlex
+import socket
+
 import click
 from pyinfra import logger
 from pyinfra.api.operation import OperationMeta
 from pyinfra.context import host
-from pyinfra.operations import files, systemd
+from pyinfra.operations import files, server, systemd
 from pyinfra.operations.util import any_changed
 
 from nullforge.molds import FeaturesMold, TelemtMold, WarpMold
-from nullforge.smithy.install import install_release_binary
+from nullforge.smithy.arch import arch_id
+from nullforge.smithy.github import sha256_for_download_url
+from nullforge.smithy.install import STAGING_DIR, install_release_binary
 from nullforge.smithy.packages import get_pm
 from nullforge.smithy.service import ensure_service_user
 from nullforge.smithy.sni import (
@@ -18,7 +23,7 @@ from nullforge.smithy.sni import (
     group_name,
     inspect_group,
 )
-from nullforge.smithy.versions import get_versions, is_pinned_version_installed
+from nullforge.smithy.versions import Versions, get_versions, is_pinned_version_installed, record_installed_version
 from nullforge.templates import BLOCK_TRIM_ENV, get_template_path
 
 
@@ -29,6 +34,18 @@ CONFIG_PATH = f"{CONFIG_DIR}/telemt.toml"
 BINARY_PATH = "/usr/local/bin/telemt"
 TELEPROXY_SCRIPT = "/usr/local/sbin/teleproxy-warp.sh"
 SYNFIX_SCRIPT = "/usr/local/sbin/telemt-synfix.sh"
+ZAPRET2_DIR = "/opt/telemt-synfix"
+NFQWS2_BIN = f"{ZAPRET2_DIR}/bin/nfqws2"
+ZAPRET2_ARCH_DIRS = {
+    "x86_64": "linux-x86_64",
+    "arm64": "linux-arm64",
+}
+ZAPRET2_LUA_DIR = f"{ZAPRET2_DIR}/lua"
+ZAPRET2_MTPROTO_LUA = f"{ZAPRET2_LUA_DIR}/mtproto.lua"
+CADDY_BIN = "/usr/local/bin/caddy"
+CADDYFILE = "/etc/caddy/Caddyfile"
+CADDY_UNIT = "/etc/systemd/system/telemt-caddy.service"
+DECOY_DIR = "/var/www/telemt-decoy"
 SERVICE_NAME = "telemt"
 SERVICE_UNIT = f"/etc/systemd/system/{SERVICE_NAME}.service"
 LOG = logger
@@ -51,7 +68,8 @@ def deploy_telemt() -> None:
     config_op = _deploy_config(telemt_opts, warp_active, warp_opts.iface)
 
     teleproxy_op = _deploy_teleproxy_script() if warp_active else None
-    synfix_op = _deploy_synfix_script() if telemt_opts.synfix else None
+    synfix_ops = _deploy_synfix_scripts(telemt_opts) if telemt_opts.synfix else []
+    web_front_ops = _deploy_web_front(telemt_opts) if telemt_opts.mode_web else []
 
     unit_op = _deploy_service_unit(
         telemt_opts,
@@ -68,7 +86,7 @@ def deploy_telemt() -> None:
 
     # The helper scripts run from telemt's ExecStartPre/ExecStopPost, so a change
     # to either takes effect on the next telemt (re)start.
-    restart_ops = [op for op in (binary_op, config_op, teleproxy_op, synfix_op, unit_op) if op]
+    restart_ops = [op for op in (binary_op, config_op, teleproxy_op, *synfix_ops, *web_front_ops, unit_op) if op]
     systemd.service(
         name="Restart telemt on change",
         service=SERVICE_NAME,
@@ -149,6 +167,18 @@ def _install_telemt() -> OperationMeta | None:
     )
 
 
+def _web_public_addr(opts: TelemtMold) -> str:
+    """web.vhosts.public_addr as a literal ip:port, defaults to resolving web_host (points at this host)."""
+
+    if opts.web_public_addr:
+        return opts.web_public_addr
+    try:
+        ip = socket.gethostbyname(opts.web_host)
+    except OSError as e:
+        raise ValueError(f"cannot resolve web_host {opts.web_host!r} for web_public_addr: {e}") from e
+    return f"{ip}:443"
+
+
 def _deploy_config(opts: TelemtMold, warp_active: bool, warp_iface: str) -> OperationMeta:
     """Render the telemt.toml configuration."""
 
@@ -176,6 +206,13 @@ def _deploy_config(opts: TelemtMold, warp_active: bool, warp_iface: str) -> Oper
         USERS=opts.users,
         ROUTE_VIA_WARP=warp_active,
         WARP_IFACE=warp_iface,
+        WEB_ENABLED=opts.mode_web,
+        WEB_PORT=opts.web_port,
+        WEB_HOST=opts.web_host,
+        WEB_BASE_PATH=opts.web_base_path,
+        WEB_PUBLIC_ADDR=_web_public_addr(opts) if opts.mode_web else "",
+        WEB_CARRIER=opts.web_carrier,
+        WEB_USERS=([opts.web_user] if opts.web_user else list(opts.users)) if opts.mode_web else [],
         _sudo=True,
     )
 
@@ -194,29 +231,189 @@ def _deploy_teleproxy_script() -> OperationMeta:
     )
 
 
-def _deploy_synfix_script() -> OperationMeta:
-    """Deploy the MEKO SYN rate-limiting helper (invoked from telemt.service).
+def _deploy_synfix_scripts(opts: TelemtMold) -> list[OperationMeta]:
+    """Deploy the MEKO fix helper. v2/v3 use nftables as xt_u32 fallback, v4 uses it for nfqws2."""
 
-    The script re-applies the iptables chain on every telemt (re)start and uses
-    RETURN semantics inserted ahead of the firewall, so it coexists with
-    UFW/firewalld rather than replacing their rules.
-    """
-
+    packages = ["iptables", "nftables"]
     get_pm().install(
-        name="Install iptables for telemt SYN fix",
-        packages=["iptables"],
+        name="Install telemt fix dependencies",
+        packages=packages,
         _sudo=True,
     )
+
+    ops: list[OperationMeta] = [
+        files.put(
+            name="Deploy telemt SYN-fix script",
+            src=get_template_path("scripts/telemt-synfix.sh"),
+            dest=SYNFIX_SCRIPT,
+            user="root",
+            group="root",
+            mode="0755",
+            _sudo=True,
+        )
+    ]
+
+    if opts.synfix == "v4":
+        zapret2_op = _install_zapret2()
+        if zapret2_op:
+            ops.append(zapret2_op)
+        ops.append(_deploy_zapret2_lua())
+
+    return ops
+
+
+def _install_zapret2() -> OperationMeta | None:
+    """Extract nfqws2 and zapret lua libs from pinned zapret2 release tarball."""
+
+    if is_pinned_version_installed("zapret2", NFQWS2_BIN):
+        host.noop("zapret2 nfqws2 is already at the pinned version")
+        return None
+
+    arch = arch_id()
+    arch_dir = ZAPRET2_ARCH_DIRS.get(arch)
+    if arch_dir is None:
+        raise ValueError(f"Unsupported architecture for zapret2: {arch}")
+
+    versions = get_versions()
+    version = versions.versions["zapret2"]
+    url = versions.zapret2_tar()
+    archive = f"{STAGING_DIR}/zapret2.tar.gz"
+    workdir = f"{STAGING_DIR}/zapret2"
+    binary_src = f"{workdir}/zapret2-{version}/binaries/{arch_dir}/nfqws2"
+
+    files.directory(
+        name="Ensure staging directory for zapret2",
+        path=STAGING_DIR,
+        mode="0700",
+        _sudo=True,
+    )
+    files.download(
+        name="Download zapret2 release",
+        src=url,
+        dest=archive,
+        force=True,
+        sha256sum=sha256_for_download_url(url),
+        extra_curl_args=Versions.release_curl_args(url),
+        _sudo=True,
+        _retries=3,
+        _retry_delay=10,
+    )
+
+    q = shlex.quote
+    op = server.shell(
+        name="Extract nfqws2 and zapret lua libs",
+        commands=[
+            f"rm -rf {q(workdir)} && mkdir -p {q(workdir)}",
+            f"tar -xzf {q(archive)} -C {q(workdir)}",
+            f"install -D -m 0755 {q(binary_src)} {q(NFQWS2_BIN)}",
+            f"mkdir -p {q(ZAPRET2_LUA_DIR)}",
+            f"find {q(workdir)} -type f -name 'zapret-*.lua*' -exec cp {{}} {q(ZAPRET2_LUA_DIR)}/ \\;",
+            f"rm -rf {q(workdir)} {q(archive)}",
+        ],
+        _sudo=True,
+    )
+
+    record_installed_version("zapret2")
+    return op
+
+
+def _deploy_zapret2_lua() -> OperationMeta:
+    """Deploy the nfqws2 desync script used by the v4 fix."""
 
     return files.put(
-        name="Deploy telemt SYN-fix script",
-        src=get_template_path("scripts/telemt-synfix.sh"),
-        dest=SYNFIX_SCRIPT,
+        name="Deploy zapret2 mtproto desync lua",
+        src=get_template_path("scripts/telemt-zapret2-mtproto.lua"),
+        dest=ZAPRET2_MTPROTO_LUA,
         user="root",
         group="root",
-        mode="0755",
+        mode="0644",
+        create_remote_dir=True,
         _sudo=True,
     )
+
+
+def _install_caddy() -> OperationMeta | None:
+    """Install the pinned caddy binary (TLS front with automatic HTTPS)."""
+
+    if is_pinned_version_installed("caddy", CADDY_BIN):
+        host.noop("caddy is already at the pinned version")
+        return None
+
+    return install_release_binary(
+        name="Install caddy binary",
+        url=get_versions().caddy_tar(),
+        dest=CADDY_BIN,
+        binary_name="caddy",
+    )
+
+
+def _deploy_web_front(opts: TelemtMold) -> list[OperationMeta]:
+    """Deploy the Caddy TLS front for telemt WEB mode. Caddy owns port 443."""
+
+    if not opts.mode_web:
+        return []
+
+    ops: list[OperationMeta] = []
+    caddy_op = _install_caddy()
+    if caddy_op:
+        ops.append(caddy_op)
+
+    ops.append(
+        files.template(
+            name="Deploy Caddyfile for telemt WEB front",
+            src=get_template_path("caddy/Caddyfile.j2"),
+            dest=CADDYFILE,
+            mode="0644",
+            jinja_env_kwargs=BLOCK_TRIM_ENV,
+            WEB_HOST=opts.web_host,
+            WEB_PORT=opts.web_port,
+            _sudo=True,
+        )
+    )
+    ops.append(
+        files.put(
+            name="Deploy WEB decoy site",
+            src=get_template_path("caddy/index.html"),
+            dest=f"{DECOY_DIR}/index.html",
+            mode="0644",
+            create_remote_dir=True,
+            _sudo=True,
+        )
+    )
+
+    unit_op = files.template(
+        name="Deploy caddy service unit",
+        src=get_template_path("systemd/telemt-caddy.service.j2"),
+        dest=CADDY_UNIT,
+        mode="0644",
+        jinja_env_kwargs=BLOCK_TRIM_ENV,
+        CADDY_BIN=CADDY_BIN,
+        CADDYFILE=CADDYFILE,
+        _sudo=True,
+    )
+    ops.append(unit_op)
+
+    systemd.daemon_reload(
+        name="Reload systemd daemon for caddy",
+        _sudo=True,
+        _if=unit_op.did_change,
+    )
+    systemd.service(
+        name="Restart caddy on change",
+        service="telemt-caddy",
+        restarted=True,
+        _sudo=True,
+        _if=any_changed(*ops),
+    )
+    systemd.service(
+        name="Ensure caddy is running and enabled",
+        service="telemt-caddy",
+        running=True,
+        enabled=True,
+        _sudo=True,
+    )
+
+    return ops
 
 
 def _deploy_service_unit(
@@ -243,8 +440,9 @@ def _deploy_service_unit(
         WARP_SERVICE=warp_service,
         WARP_IFACE=warp_iface,
         TELEPROXY_SCRIPT=TELEPROXY_SCRIPT,
-        SYNFIX_ENABLED=opts.synfix,
+        SYNFIX_ENABLED=opts.synfix is not None,
         SYNFIX_SCRIPT=SYNFIX_SCRIPT,
+        SYNFIX_TYPE=opts.synfix or "v2",
         _sudo=True,
     )
 

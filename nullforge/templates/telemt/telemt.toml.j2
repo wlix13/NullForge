@@ -4,6 +4,11 @@
 fast_mode = {{ FAST_MODE | lower }}
 use_middle_proxy = {{ USE_MIDDLE_PROXY | lower }}
 log_level = "silent"
+{% if WEB_ENABLED %}
+
+[general.links]
+show = "*"
+{% endif %}
 
 [general.modes]
 classic = {{ MODE_CLASSIC | lower }}
@@ -16,6 +21,39 @@ port = {{ PORT }}
 
 [server.api]
 enabled = {{ API_ENABLED | lower }}
+{% if WEB_ENABLED %}
+
+[[server.listeners]]
+ip = "127.0.0.1"
+port = {{ WEB_PORT }}
+transport = "web"
+proxy_protocol = false
+web_client_ip_source = "x_forwarded_for"
+web_trusted_proxy_cidrs = ["127.0.0.1/32"]
+
+[web]
+enabled = true
+carrier = "{{ WEB_CARRIER }}"
+
+[[web.vhosts]]
+host = "{{ WEB_HOST }}"
+{% if WEB_BASE_PATH %}base_path = "{{ WEB_BASE_PATH }}"
+{% endif %}public_addr = "{{ WEB_PUBLIC_ADDR }}"
+
+[web.vhosts.decoy]
+mode = "static_directory"
+directory = "/var/www/telemt-decoy"
+index = "index.html"
+
+{% for WEB_USER in WEB_USERS %}
+[[web.vhosts.profiles]]
+user = "{{ WEB_USER }}"
+secret_mode = "dd"
+max_sessions = 8
+max_streams = 512
+max_streams_per_session = 64
+{% endfor %}
+{% endif %}
 
 [network]
 ipv6 = {{ IPV6 | lower }}
