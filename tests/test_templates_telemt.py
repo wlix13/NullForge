@@ -35,10 +35,48 @@ def _config(**overrides: object) -> dict:
         "USERS": {"personal": "bf777cca8384a074a671460d51e4e31f"},
         "ROUTE_VIA_WARP": True,
         "WARP_IFACE": "warp",
+        "WEB_ENABLED": False,
+        "WEB_PORT": 18080,
+        "WEB_HOST": "",
+        "WEB_BASE_PATH": "",
+        "WEB_PUBLIC_ADDR": "",
+        "WEB_CARRIER": "https",
+        "WEB_USERS": [],
+        "DECOY_PORT": 18081,
     }
     context.update(overrides)
-    rendered = _render("telemt/telemt.toml.j2", **context)
-    return tomllib.loads(rendered)
+    return tomllib.loads(_render("telemt/telemt.toml.j2", **context))
+
+
+def _render_config(**overrides: object) -> str:
+    context: dict[str, object] = {
+        "FAST_MODE": True,
+        "USE_MIDDLE_PROXY": False,
+        "MODE_CLASSIC": False,
+        "MODE_SECURE": False,
+        "MODE_TLS": True,
+        "MAX_CONNECTIONS": 16384,
+        "CLIENT_HANDSHAKE": 30,
+        "PORT": 443,
+        "API_ENABLED": False,
+        "IPV6": True,
+        "PREFER": 6,
+        "TLS_DOMAIN": "wlix13.dev",
+        "UNKNOWN_SNI_ACTION": None,
+        "USERS": {"personal": "bf777cca8384a074a671460d51e4e31f"},
+        "ROUTE_VIA_WARP": False,
+        "WARP_IFACE": "warp",
+        "WEB_ENABLED": False,
+        "WEB_PORT": 18080,
+        "WEB_HOST": "",
+        "WEB_BASE_PATH": "",
+        "WEB_PUBLIC_ADDR": "",
+        "WEB_CARRIER": "https",
+        "WEB_USERS": [],
+        "DECOY_PORT": 18081,
+    }
+    context.update(overrides)
+    return _render("telemt/telemt.toml.j2", **context)
 
 
 class TestConfigTemplate:
@@ -65,6 +103,42 @@ class TestConfigTemplate:
     def test_unknown_sni_emitted_when_set(self) -> None:
         data = _config(UNKNOWN_SNI_ACTION="mask")
         assert data["censorship"]["unknown_sni_action"] == "mask"
+
+    def test_web_disabled_by_default(self) -> None:
+        rendered = _render_config()
+        assert "[web]" not in rendered
+        assert 'transport = "web"' not in rendered
+
+    def test_web_mode_renders_web_sections(self) -> None:
+        data = _config(
+            WEB_ENABLED=True,
+            WEB_PORT=18080,
+            WEB_HOST="pulsar.example.com",
+            WEB_BASE_PATH="telegram/web",
+            WEB_PUBLIC_ADDR="203.0.113.10:443",
+            WEB_CARRIER="https",
+            WEB_USERS=["personal", "guests"],
+        )
+        web = data["web"]
+        assert web["enabled"] is True
+        assert web["carrier"] == "https"
+        vhost = web["vhosts"][0]
+        assert vhost["host"] == "pulsar.example.com"
+        assert vhost["base_path"] == "telegram/web"
+        assert vhost["public_addr"] == "203.0.113.10:443"
+        assert vhost["decoy"]["upstream"] == "http://127.0.0.1:18081"
+        profiles = vhost["profiles"]
+        assert [p["user"] for p in profiles] == ["personal", "guests"]
+        assert all(p["secret_mode"] == "dd" for p in profiles)
+        assert all(
+            p["max_sessions"] == 8 and p["max_streams"] == 512 and p["max_streams_per_session"] == 64 for p in profiles
+        )
+        listeners = data["server"]["listeners"]
+        assert listeners[0]["transport"] == "web"
+        assert listeners[0]["ip"] == "127.0.0.1"
+        assert listeners[0]["port"] == 18080
+        assert listeners[0]["web_client_ip_source"] == "x_forwarded_for"
+        assert data["general"]["links"]["show"] == "*"
 
 
 def _service(**overrides: object) -> str:
@@ -112,3 +186,29 @@ class TestServiceTemplate:
     def test_synfix_wiring_absent_when_disabled(self) -> None:
         unit = _service(SYNFIX_ENABLED=False)
         assert "telemt-synfix.sh" not in unit
+
+
+class TestCaddyTemplates:
+    def test_caddyfile_renders_public_and_decoy_sites(self) -> None:
+        caddyfile = _render(
+            "caddy/Caddyfile.j2",
+            WEB_HOST="pulsar.example.com",
+            WEB_PORT=18080,
+            DECOY_PORT=18081,
+            DECOY_DIR="/var/www/telemt-decoy",
+        )
+        assert "pulsar.example.com {" in caddyfile
+        assert "reverse_proxy 127.0.0.1:18080 {\n\t\theader_up X-Forwarded-For {remote_host}\n\t}" in caddyfile
+        assert "http://127.0.0.1:18081 {" in caddyfile
+        assert "root * /var/www/telemt-decoy" in caddyfile
+
+    def test_caddy_service_unit(self) -> None:
+        unit = _render(
+            "systemd/caddy.service.j2",
+            CADDY_BIN="/usr/local/bin/caddy",
+            CADDYFILE="/etc/caddy/Caddyfile",
+        )
+        assert "ExecStart=/usr/local/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile" in unit
+        assert "StateDirectory=caddy" in unit
+        assert "Environment=XDG_DATA_HOME=/var/lib/caddy" in unit
+        assert "WantedBy=multi-user.target" in unit

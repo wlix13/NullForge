@@ -1,0 +1,20 @@
+[Unit]
+Description=Caddy TLS front for telemt WEB proxy
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+StateDirectory=caddy
+Environment=XDG_CONFIG_HOME=/var/lib/caddy
+Environment=XDG_DATA_HOME=/var/lib/caddy
+ExecStart={{ CADDY_BIN }} run --config {{ CADDYFILE }} --adapter caddyfile
+ExecReload={{ CADDY_BIN }} reload --config {{ CADDYFILE }} --adapter caddyfile
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

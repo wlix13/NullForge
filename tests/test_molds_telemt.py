@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
 from pydantic import ValidationError
@@ -78,3 +78,59 @@ class TestSynfix:
     def test_rejects_unknown_variant(self) -> None:
         with pytest.raises(ValidationError):
             TelemtMold.model_validate({"synfix": "v5"})
+
+
+class TestWebMode:
+    def _base(self, **kwargs: Any) -> TelemtMold:
+        kwargs.setdefault("web_host", "pulsar.example.com")
+        return TelemtMold(
+            install=True,
+            tls_domain="example.com",
+            users={"a": VALID_SECRET},
+            port=8443,
+            mode_web=True,
+            **kwargs,
+        )
+
+    def test_web_disabled_by_default(self) -> None:
+        assert TelemtMold().mode_web is False
+
+    def test_web_accepted_off_port_443(self) -> None:
+        mold = self._base()
+        assert mold.web_host == "pulsar.example.com"
+        assert mold.web_carrier == "https"
+
+    def test_web_requires_host(self) -> None:
+        with pytest.raises(ValidationError, match="web_host"):
+            TelemtMold(install=True, tls_domain="example.com", users={"a": VALID_SECRET}, mode_web=True)
+
+    def test_web_on_port_443_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="port 443"):
+            TelemtMold(
+                install=True,
+                tls_domain="example.com",
+                users={"a": VALID_SECRET},
+                port=443,
+                mode_web=True,
+                web_host="pulsar.example.com",
+            )
+
+    def test_web_user_must_exist_in_users(self) -> None:
+        with pytest.raises(ValidationError, match="web_user"):
+            self._base(web_user="ghost")
+
+    def test_web_user_accepted_when_listed(self) -> None:
+        assert self._base(web_user="a").mode_web is True
+
+    def test_base_path_validation(self) -> None:
+        with pytest.raises(ValidationError, match="web_base_path"):
+            self._base(web_base_path="/bad path/")
+        assert self._base(web_base_path="telegram/web").web_base_path == "telegram/web"
+
+    def test_host_normalized(self) -> None:
+        assert self._base(web_host=" Pulsar.Example.COM ").web_host == "pulsar.example.com"
+
+    def test_public_addr_must_be_literal_socket_address(self) -> None:
+        with pytest.raises(ValidationError, match="ip:port"):
+            self._base(web_public_addr="pulsar.example.com:443")
+        assert self._base(web_public_addr="203.0.113.10:443").web_public_addr == "203.0.113.10:443"

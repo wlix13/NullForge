@@ -31,6 +31,13 @@ With `pq_check` on (default), the domain is probed at plan time from the control
 | `mode_classic` | `false` | Classic unobfuscated mode |
 | `route_via_warp` | `false` | Route Telegram egress through [WARP](warp.md) (per-uid policy routing) |
 | `synfix` | `None` | MEKO MTProto fix variant ([MTPROTO_FIX_By_MEKO](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO)), `None` disables: `v2` rate-limits SYNs per source IP with an iOS bypass via TTL+Length; `v3` detects iOS by u32 TCP fingerprint (mark in mangle/PREROUTING) instead, for paths where load balancers break TTL/length; `v4` runs zapret2 `nfqws2` desync (window clamp + disorder/badsum) with no SYN limit — note clients whose own router runs zapret cannot connect to a v4 proxy |
+| `mode_web` | `false` | Enable [WEB proxy mode](#web-proxy-mode) (`tg://webproxy` links) behind a Caddy TLS front; requires `web_host` and a non-443 MTProto `port` |
+| `web_host` | `""` | Public FQDN of the WEB TLS front; its DNS record must point at this host |
+| `web_public_addr` | resolved from `web_host` | Literal `ip:port` for `web.vhosts.public_addr`; telemt rejects hostnames there, so an empty value resolves `web_host` at deploy time |
+| `web_base_path` | `""` | Optional URL subtree for the WEB vhost (slash-separated segments, empty = whole vhost) |
+| `web_port` | `18080` | Loopback port of the WEB listener the front proxies to (TCP only; telemt WEB listeners do not support unix sockets) |
+| `web_carrier` | `https` | WEB carrier; iOS clients support only `https` |
+| `web_user` | all users | Limit the WEB vhost to this single access user; empty renders one WEB profile per entry in `users` (one `tg://webproxy` link each, `dd`-prefixed) |
 | `pq_check` | `true` | Vet `tls_domain` for post-quantum support at deploy time |
 | `max_connections` | `16384` | Concurrent client connections |
 | `client_handshake` | `30` | Client handshake timeout, seconds |
@@ -59,3 +66,16 @@ telemt = TelemtMold(
 ```
 
 Generate secrets with `openssl rand -hex 16`.
+
+## WEB proxy mode
+
+With `mode_web` set, telemt additionally runs a loopback WEB listener (`transport = "web"`, default `web_port` 18080) and NullForge deploys a pinned [Caddy](https://caddyserver.com) on port 443 as the TLS front: it owns the certificate (automatic HTTPS) for `web_host` and forwards plain HTTP/1.1 to the WEB listener, while a loopback decoy site answers ordinary requests. Clients use `tg://webproxy?server=<host>&secret=...` links (printed at telemt startup), which Telegram Desktop's WEB proxy type carries as ordinary HTTPS/WebSocket — no MTProto handshake on the wire to fingerprint.
+
+Constraints:
+
+- `web_host` must be a dedicated FQDN whose DNS record points at this host, because Caddy gets a real certificate for it.
+- The MTProto listener `port` must not be 443 (Caddy owns it) — use the default 8443; the mold rejects `port = 443` with `mode_web` set.
+- WEB mode supports `plain` and `dd` secrets only (`ee`/Fake-TLS is not supported); NullForge hardcodes `dd` (padding/obfuscation; plain is encapsulated in HTTPS anyway, but dd is the recommended form). With several MTProto groups, leave `web_user` empty: each user in `users` gets its own WEB profile and its own `tg://webproxy?server=<host>&secret=dd<secret>` link. Profile quotas are fixed (8 sessions / 512 streams / 64 per session).
+- iOS clients support only the `https` carrier, which is the default (`web_carrier`).
+- telemt WEB listeners are TCP-only (`[[server.listeners]]` has no unix-socket field; `server.listen_unix_sock` applies to the main MTProto listener only), so the front reaches telemt over loopback TCP on `web_port`.
+- Caddy 2.10+ negotiates X25519MLKEM768 by default, so the real TLS endpoint is post-quantum; the `pq_check` on `tls_domain` still applies to the Fake-TLS ee links.

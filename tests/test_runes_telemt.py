@@ -103,3 +103,42 @@ class TestVerdictWording:
         assert "could not be vetted" in verdict
         assert "timed out" in verdict
         assert "blocked" not in verdict
+
+
+class TestWebPublicAddr:
+    def test_explicit_addr_passes_through(self) -> None:
+        opts = TelemtMold(
+            install=True,
+            tls_domain="d",
+            users={"a": VALID_SECRET},
+            mode_web=True,
+            web_host="pulsar.example.com",
+            web_public_addr="203.0.113.10:443",
+        )
+        assert telemt._web_public_addr(opts) == "203.0.113.10:443"
+
+    def test_resolves_web_host_when_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(telemt.socket, "gethostbyname", lambda h: "203.0.113.10")
+        opts = TelemtMold(
+            install=True,
+            tls_domain="d",
+            users={"a": VALID_SECRET},
+            mode_web=True,
+            web_host="pulsar.example.com",
+        )
+        assert telemt._web_public_addr(opts) == "203.0.113.10:443"
+
+    def test_unresolvable_host_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def _fail(h: str) -> str:
+            raise OSError("no DNS")
+
+        monkeypatch.setattr(telemt.socket, "gethostbyname", _fail)
+        opts = TelemtMold(
+            install=True,
+            tls_domain="d",
+            users={"a": VALID_SECRET},
+            mode_web=True,
+            web_host="pulsar.example.com",
+        )
+        with pytest.raises(ValueError, match="cannot resolve web_host"):
+            telemt._web_public_addr(opts)
