@@ -1,14 +1,17 @@
 """Telemt MTProto proxy deployment module."""
 
+import shlex
+
 import click
 from pyinfra import logger
 from pyinfra.api.operation import OperationMeta
 from pyinfra.context import host
-from pyinfra.operations import files, systemd
+from pyinfra.operations import files, server, systemd
 from pyinfra.operations.util import any_changed
 
 from nullforge.molds import FeaturesMold, TelemtMold, WarpMold
-from nullforge.smithy.install import install_release_binary
+from nullforge.smithy.github import sha256_for_download_url
+from nullforge.smithy.install import STAGING_DIR, install_release_binary
 from nullforge.smithy.packages import get_pm
 from nullforge.smithy.service import ensure_service_user
 from nullforge.smithy.sni import (
@@ -18,7 +21,7 @@ from nullforge.smithy.sni import (
     group_name,
     inspect_group,
 )
-from nullforge.smithy.versions import get_versions, is_pinned_version_installed
+from nullforge.smithy.versions import Versions, get_versions, is_pinned_version_installed, record_installed_version
 from nullforge.templates import BLOCK_TRIM_ENV, get_template_path
 
 
@@ -29,6 +32,10 @@ CONFIG_PATH = f"{CONFIG_DIR}/telemt.toml"
 BINARY_PATH = "/usr/local/bin/telemt"
 TELEPROXY_SCRIPT = "/usr/local/sbin/teleproxy-warp.sh"
 SYNFIX_SCRIPT = "/usr/local/sbin/telemt-synfix.sh"
+ZAPRET2_DIR = "/opt/telemt-synfix"
+NFQWS2_BIN = f"{ZAPRET2_DIR}/bin/nfqws2"
+ZAPRET2_LUA_DIR = f"{ZAPRET2_DIR}/lua"
+ZAPRET2_MTPROTO_LUA = f"{ZAPRET2_LUA_DIR}/mtproto.lua"
 SERVICE_NAME = "telemt"
 SERVICE_UNIT = f"/etc/systemd/system/{SERVICE_NAME}.service"
 LOG = logger
@@ -51,7 +58,7 @@ def deploy_telemt() -> None:
     config_op = _deploy_config(telemt_opts, warp_active, warp_opts.iface)
 
     teleproxy_op = _deploy_teleproxy_script() if warp_active else None
-    synfix_op = _deploy_synfix_script() if telemt_opts.synfix else None
+    synfix_ops = _deploy_synfix_scripts(telemt_opts) if telemt_opts.synfix else []
 
     unit_op = _deploy_service_unit(
         telemt_opts,
@@ -68,7 +75,7 @@ def deploy_telemt() -> None:
 
     # The helper scripts run from telemt's ExecStartPre/ExecStopPost, so a change
     # to either takes effect on the next telemt (re)start.
-    restart_ops = [op for op in (binary_op, config_op, teleproxy_op, synfix_op, unit_op) if op]
+    restart_ops = [op for op in (binary_op, config_op, teleproxy_op, *synfix_ops, unit_op) if op]
     systemd.service(
         name="Restart telemt on change",
         service=SERVICE_NAME,
@@ -194,27 +201,103 @@ def _deploy_teleproxy_script() -> OperationMeta:
     )
 
 
-def _deploy_synfix_script() -> OperationMeta:
-    """Deploy the MEKO SYN rate-limiting helper (invoked from telemt.service).
+def _deploy_synfix_scripts(opts: TelemtMold) -> list[OperationMeta]:
+    """Deploy the MEKO fix helper (invoked from telemt.service) and, for v4, zapret2.
 
-    The script re-applies the iptables chain on every telemt (re)start and uses
-    RETURN semantics inserted ahead of the firewall, so it coexists with
-    UFW/firewalld rather than replacing their rules.
+    The script re-applies its rules on every telemt (re)start and picks the
+    variant from its type argument: v2/v3 insert RETURN rules ahead of the
+    firewall so they coexist with UFW/firewalld, v4 manages its own nftables
+    table and a daemonized nfqws2 instead of any SYN limit.
     """
 
+    packages = ["iptables"]
+    if opts.synfix == "v4":
+        packages.append("nftables")
     get_pm().install(
-        name="Install iptables for telemt SYN fix",
-        packages=["iptables"],
+        name="Install telemt fix dependencies",
+        packages=packages,
         _sudo=True,
     )
 
+    ops: list[OperationMeta] = [
+        files.put(
+            name="Deploy telemt SYN-fix script",
+            src=get_template_path("scripts/telemt-synfix.sh"),
+            dest=SYNFIX_SCRIPT,
+            user="root",
+            group="root",
+            mode="0755",
+            _sudo=True,
+        )
+    ]
+
+    if opts.synfix == "v4":
+        zapret2_op = _install_zapret2()
+        if zapret2_op:
+            ops.append(zapret2_op)
+        ops.append(_deploy_zapret2_lua())
+
+    return ops
+
+
+def _install_zapret2() -> OperationMeta | None:
+    """Extract nfqws2 and the zapret lua libs from the pinned zapret2 release tarball."""
+
+    if is_pinned_version_installed("zapret2", NFQWS2_BIN):
+        host.noop("zapret2 nfqws2 is already at the pinned version")
+        return None
+
+    url = get_versions().zapret2_tar()
+    archive = f"{STAGING_DIR}/zapret2.tar.gz"
+    workdir = f"{STAGING_DIR}/zapret2"
+
+    files.directory(
+        name="Ensure staging directory for zapret2",
+        path=STAGING_DIR,
+        mode="0700",
+        _sudo=True,
+    )
+    files.download(
+        name="Download zapret2 release",
+        src=url,
+        dest=archive,
+        force=True,
+        sha256sum=sha256_for_download_url(url),
+        extra_curl_args=Versions.release_curl_args(url),
+        _sudo=True,
+        _retries=3,
+        _retry_delay=10,
+    )
+
+    q = shlex.quote
+    op = server.shell(
+        name="Extract nfqws2 and zapret lua libs",
+        commands=[
+            f"rm -rf {q(workdir)} && mkdir -p {q(workdir)}",
+            f"tar -xzf {q(archive)} -C {q(workdir)}",
+            f'install -D -m 0755 "$(find {q(workdir)} -type f -name nfqws2 | head -n1)" {q(NFQWS2_BIN)}',
+            f"mkdir -p {q(ZAPRET2_LUA_DIR)}",
+            f"find {q(workdir)} -type f -name 'zapret-*.lua*' -exec cp {{}} {q(ZAPRET2_LUA_DIR)}/ \\;",
+            f"rm -rf {q(workdir)} {q(archive)}",
+        ],
+        _sudo=True,
+    )
+
+    record_installed_version("zapret2")
+    return op
+
+
+def _deploy_zapret2_lua() -> OperationMeta:
+    """Deploy the nfqws2 desync script used by the v4 fix."""
+
     return files.put(
-        name="Deploy telemt SYN-fix script",
-        src=get_template_path("scripts/telemt-synfix.sh"),
-        dest=SYNFIX_SCRIPT,
+        name="Deploy zapret2 mtproto desync lua",
+        src=get_template_path("scripts/telemt-zapret2-mtproto.lua"),
+        dest=ZAPRET2_MTPROTO_LUA,
         user="root",
         group="root",
-        mode="0755",
+        mode="0644",
+        create_remote_dir=True,
         _sudo=True,
     )
 
@@ -243,8 +326,9 @@ def _deploy_service_unit(
         WARP_SERVICE=warp_service,
         WARP_IFACE=warp_iface,
         TELEPROXY_SCRIPT=TELEPROXY_SCRIPT,
-        SYNFIX_ENABLED=opts.synfix,
+        SYNFIX_ENABLED=opts.synfix is not None,
         SYNFIX_SCRIPT=SYNFIX_SCRIPT,
+        SYNFIX_TYPE=opts.synfix or "v2",
         _sudo=True,
     )
 

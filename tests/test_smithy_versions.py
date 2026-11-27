@@ -87,6 +87,14 @@ class TestVersionsUrls:
             url = v.telemt_tar()
         assert "/releases/latest/download/" in url
 
+    def test_zapret2_tar_url(self) -> None:
+        with _versions_context() as v:
+            version = DEFAULT_VERSIONS["zapret2"]
+            assert (
+                v.zapret2_tar()
+                == f"https://github.com/bol-van/zapret2/releases/download/{version}/zapret2-{version}.tar.gz"
+            )
+
     def test_nvim_x86_is_appimage(self) -> None:
         with _versions_context("x86_64") as v:
             url = v.nvim_appimage()

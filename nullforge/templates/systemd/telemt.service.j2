@@ -17,8 +17,8 @@ ExecStart={{ BINARY_PATH }} {{ CONFIG_PATH }}
 ExecStartPre=+{{ TELEPROXY_SCRIPT }} up {{ USER }} {{ WARP_IFACE }}
 {% endif %}
 {% if SYNFIX_ENABLED %}
-ExecStartPre=+{{ SYNFIX_SCRIPT }} up {{ PORT }}
-ExecStopPost=+{{ SYNFIX_SCRIPT }} down {{ PORT }}
+ExecStartPre=+{{ SYNFIX_SCRIPT }} up {{ PORT }} {{ SYNFIX_TYPE }}
+ExecStopPost=+{{ SYNFIX_SCRIPT }} down {{ PORT }} {{ SYNFIX_TYPE }}
 {% endif %}
 {% if WARP_ENABLED %}
 ExecStopPost=+{{ TELEPROXY_SCRIPT }} down {{ USER }} {{ WARP_IFACE }}

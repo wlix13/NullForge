@@ -11,6 +11,9 @@ from .base_mold import BaseMold
 TelemtIpPreference = Literal[4, 6]
 """Address family telemt prefers when both are available (network.prefer)."""
 
+SynfixType = Literal["v2", "v3", "v4"]
+"""MEKO fix variant: v2 TTL+Length iOS bypass, v3 u32 fingerprint, v4 zapret2/nfqws2 desync."""
+
 _SECRET_RE = re.compile(r"^[0-9a-f]{32}$")
 """Telemt user secrets are 16 bytes rendered as 32 lowercase hex characters."""
 
@@ -100,9 +103,13 @@ class TelemtMold(BaseMold):
         default=False,
         description="Route Telegram-bound egress through WARP via per-uid policy routing",
     )
-    synfix: bool = Field(
-        default=False,
-        description="Apply MEKO SYN rate-limiting fix",
+    synfix: SynfixType | None = Field(
+        default=None,
+        description=(
+            "MEKO MTProto fix variant applied by telemt-synfix.sh, or None to disable: "
+            "v2 (iOS bypass via TTL+Length), v3 (iOS bypass via u32 TCP fingerprint), "
+            "v4 (zapret2 nfqws2 desync, no SYN limit)"
+        ),
     )
 
     @property

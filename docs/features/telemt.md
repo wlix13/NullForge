@@ -9,7 +9,7 @@ An MTProto proxy for Telegram via [telemt](https://github.com/telemt/telemt), wi
 - The pinned `telemt` binary, run as a dedicated `telemt` service user.
 - `/etc/telemt/telemt.toml` (mode `0640`) rendered from the mold - modes, users, network preferences, timeouts.
 - A systemd unit; with `route_via_warp` (and [WARP](warp.md) active), a per-uid policy-routing helper sends Telegram-bound egress through the WARP interface, and the unit orders itself after the WARP service.
-- With `synfix`, an iptables helper that re-applies a SYN rate-limiting chain on every (re)start; it inserts `RETURN` rules ahead of the firewall, so it coexists with UFW/firewalld.
+- With `synfix` set, a MEKO-style fix helper re-applies its rules on every (re)start via `ExecStartPre`/`ExecStopPost`. The value picks the variant: `v2`/`v3` insert `RETURN` rules ahead of the firewall so they coexist with UFW/firewalld; `v4` manages its own nftables queue table and a daemonized `nfqws2` (zapret2) instead of any SYN limit.
 
 ## Fake-TLS and the post-quantum check
 
@@ -30,7 +30,7 @@ With `pq_check` on (default), the domain is probed at plan time from the control
 | `mode_secure` | `false` | Secure (`dd`-prefixed) mode |
 | `mode_classic` | `false` | Classic unobfuscated mode |
 | `route_via_warp` | `false` | Route Telegram egress through [WARP](warp.md) (per-uid policy routing) |
-| `synfix` | `false` | Apply the MEKO SYN rate-limiting fix |
+| `synfix` | `None` | MEKO MTProto fix variant ([MTPROTO_FIX_By_MEKO](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO)), `None` disables: `v2` rate-limits SYNs per source IP with an iOS bypass via TTL+Length; `v3` detects iOS by u32 TCP fingerprint (mark in mangle/PREROUTING) instead, for paths where load balancers break TTL/length; `v4` runs zapret2 `nfqws2` desync (window clamp + disorder/badsum) with no SYN limit — note clients whose own router runs zapret cannot connect to a v4 proxy |
 | `pq_check` | `true` | Vet `tls_domain` for post-quantum support at deploy time |
 | `max_connections` | `16384` | Concurrent client connections |
 | `client_handshake` | `30` | Client handshake timeout, seconds |
@@ -54,7 +54,7 @@ telemt = TelemtMold(
     tls_domain="cdn.example.com",
     users={"example": "bf777cca8384a074a671460d51e4e31f"},
     route_via_warp=True,
-    synfix=True,
+    synfix="v3",
 )
 ```
 

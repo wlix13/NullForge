@@ -80,6 +80,7 @@ def _service(**overrides: object) -> str:
         "TELEPROXY_SCRIPT": "/usr/local/sbin/teleproxy-warp.sh",
         "SYNFIX_ENABLED": True,
         "SYNFIX_SCRIPT": "/usr/local/sbin/telemt-synfix.sh",
+        "SYNFIX_TYPE": "v2",
     }
     context.update(overrides)
     return _render("systemd/telemt.service.j2", **context)
@@ -100,8 +101,13 @@ class TestServiceTemplate:
 
     def test_synfix_wiring_present_when_enabled(self) -> None:
         unit = _service(SYNFIX_ENABLED=True, PORT=8443)
-        assert "ExecStartPre=+/usr/local/sbin/telemt-synfix.sh up 8443" in unit
-        assert "ExecStopPost=+/usr/local/sbin/telemt-synfix.sh down 8443" in unit
+        assert "ExecStartPre=+/usr/local/sbin/telemt-synfix.sh up 8443 v2" in unit
+        assert "ExecStopPost=+/usr/local/sbin/telemt-synfix.sh down 8443 v2" in unit
+
+    def test_synfix_type_passed_through(self) -> None:
+        unit = _service(SYNFIX_ENABLED=True, SYNFIX_TYPE="v4", PORT=443)
+        assert "ExecStartPre=+/usr/local/sbin/telemt-synfix.sh up 443 v4" in unit
+        assert "ExecStopPost=+/usr/local/sbin/telemt-synfix.sh down 443 v4" in unit
 
     def test_synfix_wiring_absent_when_disabled(self) -> None:
         unit = _service(SYNFIX_ENABLED=False)

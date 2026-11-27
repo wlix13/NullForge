@@ -1,3 +1,5 @@
+from typing import Literal
+
 import pytest
 from pydantic import ValidationError
 
@@ -63,3 +65,16 @@ class TestRedaction:
         dumped = mold.to_json()
         assert dumped["users"] == "***"
         assert VALID_SECRET not in str(dumped)
+
+
+class TestSynfix:
+    def test_defaults_to_disabled(self) -> None:
+        assert TelemtMold().synfix is None
+
+    @pytest.mark.parametrize("variant", ["v2", "v3", "v4"])
+    def test_accepts_all_variants(self, variant: Literal["v2", "v3", "v4"]) -> None:
+        assert TelemtMold(synfix=variant).synfix == variant
+
+    def test_rejects_unknown_variant(self) -> None:
+        with pytest.raises(ValidationError):
+            TelemtMold.model_validate({"synfix": "v5"})
