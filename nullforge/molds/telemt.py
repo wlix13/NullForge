@@ -1,5 +1,6 @@
 """Telemt (MTProto proxy) configuration mold."""
 
+import ipaddress
 import re
 from enum import StrEnum
 from typing import ClassVar, Literal
@@ -23,6 +24,27 @@ class SynfixType(StrEnum):
 
     V4 = "v4"
     """zapret2 nfqws2 server-side desync, no SYN limit. Clients whose router runs zapret cannot connect."""
+
+
+class TelemtWebCarrier(StrEnum):
+    """WEB carrier values."""
+
+    HTTPS = "https"
+    """Only carrier Telegram iOS clients support."""
+
+    HTTPS_LANES = "https-lanes"
+    """Same HTTPS path but sharded across multiple connection lanes."""
+
+    WEBSOCKET = "websocket"
+    """WebSocket transport for non-iOS clients needing obfuscation."""
+
+    WEBSOCKET_LANES = "websocket-lanes"
+    """WebSocket transport sharded across multiple connection lanes."""
+
+
+_BASE_PATH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*(/[A-Za-z0-9][A-Za-z0-9_-]*)*$")
+"""WEB vhost base_path: slash-separated segments, no leading/trailing slash, max 128 bytes."""
+
 
 _SECRET_RE = re.compile(r"^[0-9a-f]{32}$")
 """Telemt user secrets are 16 bytes rendered as 32 lowercase hex characters."""
@@ -121,6 +143,39 @@ class TelemtMold(BaseMold):
             "v4 (zapret2 nfqws2 desync, no SYN limit)"
         ),
     )
+    mode_web: bool = Field(
+        default=False,
+        description="Enable telemt WEB proxy mode (tg://webproxy links) behind a Caddy TLS front on port 443",
+    )
+    web_host: str = Field(
+        default="",
+        description="Public FQDN of the WEB TLS front. Its DNS record must point at this host (required when mode_web)",
+    )
+    web_public_addr: str = Field(
+        default="",
+        description=(
+            "Public ip:port for web.vhosts.public_addr. Empty resolves web_host at deploy time "
+            "(telemt needs a literal socket address, not a hostname)"
+        ),
+    )
+    web_base_path: str = Field(
+        default="",
+        description="Optional URL subtree for the WEB vhost (slash-separated segments, empty = whole vhost)",
+    )
+    web_port: int = Field(
+        default=18080,
+        ge=1,
+        le=65535,
+        description="Loopback port of the WEB listener the TLS front proxies to",
+    )
+    web_carrier: TelemtWebCarrier = Field(
+        default=TelemtWebCarrier.HTTPS,
+        description="WEB carrier (see TelemtWebCarrier)",
+    )
+    web_user: str = Field(
+        default="",
+        description="Limit the WEB vhost to this single access user. Empty means one WEB profile per entry in users",
+    )
 
     @property
     def is_active(self) -> bool:
@@ -154,4 +209,39 @@ class TelemtMold(BaseMold):
             raise ValueError("`tls_domain` is required when install is True and the Fake-TLS mode is enabled")
         if not (self.mode_classic or self.mode_secure or self.mode_tls):
             raise ValueError("at least one of mode_classic/mode_secure/mode_tls must be enabled when install is True")
+        if self.mode_web:
+            if not self.web_host:
+                raise ValueError("`web_host` is required when mode_web is enabled")
+            if self.web_public_addr:
+                try:
+                    host_part, _, port_str = self.web_public_addr.rpartition(":")
+                    if not host_part or not port_str:
+                        raise ValueError
+                    if host_part.startswith("[") and host_part.endswith("]"):
+                        host_part = host_part[1:-1]
+                    ipaddress.ip_address(host_part)
+                    port = int(port_str)
+                    if not 1 <= port <= 65535:
+                        raise ValueError
+                except ValueError:
+                    raise ValueError(
+                        f"web_public_addr must be a literal ip:port, got {self.web_public_addr!r}"
+                    ) from None
+            if self.port == 443:
+                raise ValueError("mode_web needs port 443 for the Caddy TLS front. Move the MTProto port (e.g. 8443)")
+            if self.web_user and self.web_user not in self.users:
+                raise ValueError(f"web_user {self.web_user!r} must be one of the entries in `users`")
         return self
+
+    @field_validator("web_host")
+    @classmethod
+    def _strip_web_host(cls, v: str) -> str:
+        return v.strip().lower()
+
+    @field_validator("web_base_path")
+    @classmethod
+    def _validate_web_base_path(cls, v: str) -> str:
+        v = v.strip().strip("/")
+        if v and (len(v.encode()) > 128 or not _BASE_PATH_RE.fullmatch(v)):
+            raise ValueError("web_base_path must be slash-separated [A-Za-z0-9_-] segments, at most 128 bytes")
+        return v
